@@ -297,12 +297,12 @@ export default function SecuritySettings() {
           </CardContent>
         </Card>
 
-        {/* Additional Security Features (placeholder for future) */}
+        {/* Additional Security Features */}
         <Card>
           <CardHeader>
             <CardTitle>Additional Security</CardTitle>
             <CardDescription>
-              More security features coming soon
+              More authentication methods for enhanced security
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -318,9 +318,9 @@ export default function SecuritySettings() {
               <div className="flex items-center justify-between">
                 <div>
                   <Label>Magic Links</Label>
-                  <p className="text-sm text-muted-foreground">Sign in with a link sent to your email</p>
+                  <p className="text-sm text-muted-foreground">Passwordless login via email link (API: POST /api/auth/magic-link/request)</p>
                 </div>
-                <Badge variant="secondary">Coming Soon</Badge>
+                <Badge variant="default">Available</Badge>
               </div>
             </div>
           </CardContent>

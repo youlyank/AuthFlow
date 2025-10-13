@@ -19,6 +19,7 @@ interface TenantStats {
   activeUsers: number;
   totalRoles: number;
   activeSessions: number;
+  mfaAdoption: number;
 }
 
 interface RecentUser {
