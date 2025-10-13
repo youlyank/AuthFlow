@@ -27,6 +27,18 @@ export const tenants = pgTable("tenants", {
   logoUrl: text("logo_url"),
   primaryColor: text("primary_color").default("#2563eb"),
   isActive: boolean("is_active").notNull().default(true),
+  // Authentication settings
+  allowPasswordAuth: boolean("allow_password_auth").notNull().default(true),
+  allowSocialAuth: boolean("allow_social_auth").notNull().default(true),
+  allowMagicLink: boolean("allow_magic_link").notNull().default(true),
+  requireEmailVerification: boolean("require_email_verification").notNull().default(true),
+  requireMfa: boolean("require_mfa").notNull().default(false),
+  sessionTimeout: integer("session_timeout").notNull().default(86400), // seconds, default 24h
+  // Domain settings
+  customDomain: text("custom_domain"),
+  allowedDomains: jsonb("allowed_domains").default(sql`'[]'::jsonb`), // email domains for signup
+  // Feature toggles
+  features: jsonb("features").notNull().default(sql`'{}'::jsonb`),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });
@@ -359,6 +371,21 @@ export const createNotificationSchema = z.object({
   message: z.string().min(1, "Message is required"),
   link: z.string().optional(),
   priority: z.enum(["low", "normal", "high"]).default("normal"),
+});
+
+export const updateTenantSettingsSchema = z.object({
+  name: z.string().min(1, "Name is required").optional(),
+  logoUrl: z.string().url("Must be a valid URL").optional().or(z.literal("")),
+  primaryColor: z.string().regex(/^#[0-9A-F]{6}$/i, "Must be a valid hex color").optional(),
+  allowPasswordAuth: z.boolean().optional(),
+  allowSocialAuth: z.boolean().optional(),
+  allowMagicLink: z.boolean().optional(),
+  requireEmailVerification: z.boolean().optional(),
+  requireMfa: z.boolean().optional(),
+  sessionTimeout: z.number().int().min(300).max(2592000).optional(),
+  customDomain: z.string().optional().or(z.literal("")),
+  allowedDomains: z.array(z.string()).optional(),
+  features: z.record(z.boolean()).optional(),
 });
 
 export type RegisterInput = z.infer<typeof registerSchema>;

@@ -21,6 +21,7 @@ import SuperAdminPlans from "@/pages/SuperAdminPlans";
 import TenantAdminDashboard from "@/pages/TenantAdminDashboard";
 import TenantAdminUsers from "@/pages/TenantAdminUsers";
 import TenantAdminSessions from "@/pages/TenantAdminSessions";
+import TenantAdminSettings from "@/pages/TenantAdminSettings";
 import UserDashboard from "@/pages/UserDashboard";
 
 function ProtectedRoute({ children, allowedRoles }: { children: React.ReactNode; allowedRoles?: string[] }) {
@@ -130,6 +131,14 @@ function Router() {
         <ProtectedRoute allowedRoles={["tenant_admin"]}>
           <DashboardLayout>
             <TenantAdminSessions />
+          </DashboardLayout>
+        </ProtectedRoute>
+      </Route>
+
+      <Route path="/admin/settings">
+        <ProtectedRoute allowedRoles={["tenant_admin"]}>
+          <DashboardLayout>
+            <TenantAdminSettings />
           </DashboardLayout>
         </ProtectedRoute>
       </Route>

@@ -12,7 +12,7 @@ import {
   requireRole,
   auditLog,
 } from "./auth";
-import { loginSchema, registerSchema, mfaVerifySchema, createNotificationSchema, passwordResetRequestSchema, passwordResetSchema } from "@shared/schema";
+import { loginSchema, registerSchema, mfaVerifySchema, createNotificationSchema, passwordResetRequestSchema, passwordResetSchema, updateTenantSettingsSchema } from "@shared/schema";
 import { emailService } from "./email";
 import speakeasy from "speakeasy";
 import QRCode from "qrcode";
@@ -820,6 +820,64 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // ===== Tenant Admin Routes =====
+
+  // Get tenant settings
+  app.get("/api/tenant-admin/settings", requireAuth, requireRole(["tenant_admin"]), async (req: Request, res: Response) => {
+    try {
+      if (!req.user.tenantId) {
+        return res.status(403).json({ error: "Tenant ID required" });
+      }
+      
+      const tenant = await storage.getTenant(req.user.tenantId);
+      if (!tenant) {
+        return res.status(404).json({ error: "Tenant not found" });
+      }
+      
+      res.json(tenant);
+    } catch (error: any) {
+      console.error("Error fetching tenant settings:", error);
+      res.status(500).json({ error: "Failed to fetch settings" });
+    }
+  });
+
+  // Update tenant settings
+  app.patch("/api/tenant-admin/settings", requireAuth, requireRole(["tenant_admin"]), async (req: Request, res: Response) => {
+    try {
+      if (!req.user.tenantId) {
+        return res.status(403).json({ error: "Tenant ID required" });
+      }
+
+      // Validate request body
+      const validated = updateTenantSettingsSchema.parse(req.body);
+
+      const updateData: Partial<typeof tenants.$inferSelect> = {};
+      
+      if (validated.name !== undefined) updateData.name = validated.name;
+      if (validated.logoUrl !== undefined) updateData.logoUrl = validated.logoUrl || null;
+      if (validated.primaryColor !== undefined) updateData.primaryColor = validated.primaryColor;
+      if (validated.allowPasswordAuth !== undefined) updateData.allowPasswordAuth = validated.allowPasswordAuth;
+      if (validated.allowSocialAuth !== undefined) updateData.allowSocialAuth = validated.allowSocialAuth;
+      if (validated.allowMagicLink !== undefined) updateData.allowMagicLink = validated.allowMagicLink;
+      if (validated.requireEmailVerification !== undefined) updateData.requireEmailVerification = validated.requireEmailVerification;
+      if (validated.requireMfa !== undefined) updateData.requireMfa = validated.requireMfa;
+      if (validated.sessionTimeout !== undefined) updateData.sessionTimeout = validated.sessionTimeout;
+      if (validated.customDomain !== undefined) updateData.customDomain = validated.customDomain || null;
+      if (validated.allowedDomains !== undefined) updateData.allowedDomains = validated.allowedDomains;
+      if (validated.features !== undefined) updateData.features = validated.features;
+
+      const updated = await storage.updateTenant(req.user.tenantId, updateData);
+      
+      await auditLog(req, "tenant.settings_updated", "tenant", req.user.tenantId, updateData);
+      
+      res.json(updated);
+    } catch (error: any) {
+      if (error.name === "ZodError") {
+        return res.status(400).json({ error: "Validation failed", details: error.errors });
+      }
+      console.error("Error updating tenant settings:", error);
+      res.status(400).json({ error: error.message || "Failed to update settings" });
+    }
+  });
 
   // List all users in tenant
   app.get("/api/tenant-admin/users", requireAuth, requireRole(["tenant_admin"]), async (req: Request, res: Response) => {
