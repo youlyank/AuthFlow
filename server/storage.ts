@@ -326,7 +326,6 @@ export class DbStorage implements IStorage {
         expiresAt: sessions.expiresAt,
         userAgent: sessions.userAgent,
         ipAddress: sessions.ipAddress,
-        deviceInfo: sessions.deviceInfo,
         lastActivityAt: sessions.lastActivityAt,
         createdAt: sessions.createdAt,
         userEmail: users.email,
