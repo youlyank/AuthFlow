@@ -101,6 +101,7 @@ export interface IStorage {
   updatePlan(id: string, data: Partial<Plan>): Promise<Plan | undefined>;
   listPlans(includeInactive?: boolean): Promise<Plan[]>;
   assignPlanToTenant(assignment: any): Promise<any>;
+  getTenantPlan(tenantId: string): Promise<{ plan: Plan, assignment: any } | undefined>;
 
   // Session operations
   createSession(session: InsertSession): Promise<Session>;
@@ -115,6 +116,7 @@ export interface IStorage {
   createNotification(notification: InsertNotification): Promise<Notification>;
   getUserNotifications(userId: string): Promise<Notification[]>;
   markNotificationAsRead(notificationId: string, userId: string): Promise<void>;
+  deleteNotification(notificationId: string, userId: string): Promise<void>;
 
   // Audit log operations
   createAuditLog(log: InsertAuditLog): Promise<void>;
@@ -290,6 +292,23 @@ export class DbStorage implements IStorage {
     return newAssignment;
   }
 
+  async getTenantPlan(tenantId: string): Promise<{ plan: Plan, assignment: any } | undefined> {
+    const result = await db
+      .select()
+      .from(tenantPlans)
+      .innerJoin(plans, eq(tenantPlans.planId, plans.id))
+      .where(eq(tenantPlans.tenantId, tenantId))
+      .orderBy(desc(tenantPlans.startDate))
+      .limit(1);
+    
+    if (result.length === 0) return undefined;
+    
+    return {
+      plan: result[0].plans,
+      assignment: result[0].tenant_plans
+    };
+  }
+
   async createSession(session: InsertSession): Promise<Session> {
     const [newSession] = await db.insert(sessions).values(session).returning();
     return newSession;
@@ -389,6 +408,21 @@ export class DbStorage implements IStorage {
       .onConflictDoNothing();
   }
 
+  async deleteNotification(notificationId: string, userId: string): Promise<void> {
+    // Delete notification reads first (foreign key constraint)
+    await db
+      .delete(notificationReads)
+      .where(eq(notificationReads.notificationId, notificationId));
+    
+    // Delete the notification
+    await db
+      .delete(notifications)
+      .where(and(
+        eq(notifications.id, notificationId),
+        eq(notifications.userId, userId)
+      ));
+  }
+
   async createAuditLog(log: InsertAuditLog): Promise<void> {
     await db.insert(auditLogs).values(log);
   }
@@ -436,14 +470,31 @@ export class DbStorage implements IStorage {
       .from(loginHistory)
       .where(sql`${loginHistory.createdAt} >= ${thirtyDaysAgo}`);
 
+    // Calculate total revenue from active tenant plans
+    const activePlans = await db
+      .select({
+        price: plans.price
+      })
+      .from(tenantPlans)
+      .innerJoin(plans, eq(tenantPlans.planId, plans.id))
+      .innerJoin(tenants, eq(tenantPlans.tenantId, tenants.id))
+      .where(and(
+        eq(tenants.isActive, true),
+        sql`${tenantPlans.endDate} IS NULL OR ${tenantPlans.endDate} > NOW()`
+      ));
+    
+    const totalRevenue = activePlans.reduce((sum, plan) => {
+      return sum + (parseFloat(plan.price) || 0);
+    }, 0);
+
     return {
       totalTenants: tenantCount.count,
       activeTenants: activeTenantsCount.count,
       totalUsers: userCount.count,
       monthlyActiveUsers: mauCount.count,
       recentLogins: recentLogins.count,
-      totalRevenue: 0,
-      revenueGrowth: 0,
+      totalRevenue: Math.round(totalRevenue),
+      revenueGrowth: 0, // Would need historical data for growth calculation
     };
   }
 

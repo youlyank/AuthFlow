@@ -568,9 +568,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const tenantsWithCounts = await Promise.all(
         tenants.map(async (tenant) => {
           const users = await storage.listUsers(tenant.id);
+          const tenantPlan = await storage.getTenantPlan(tenant.id);
           return {
             ...tenant,
-            plan: "Starter", // Would come from tenantPlans join
+            plan: tenantPlan?.plan.name || "No Plan",
             users: users.length,
             status: tenant.isActive ? "active" : "inactive",
           };
@@ -1525,7 +1526,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.delete("/api/notifications/:id", requireAuth, async (req: Request, res: Response) => {
     try {
-      // In a real implementation, delete the notification
+      await storage.deleteNotification(req.params.id, req.user.id);
       res.json({ message: "Notification deleted" });
     } catch (error: any) {
       console.error("Error deleting notification:", error);
