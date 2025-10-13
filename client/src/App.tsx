@@ -25,6 +25,7 @@ import TenantAdminSettings from "@/pages/TenantAdminSettings";
 import UserDashboard from "@/pages/UserDashboard";
 import SecuritySettings from "@/pages/SecuritySettings";
 import WebhookManagement from "@/pages/WebhookManagement";
+import ApiKeyManagement from "@/pages/ApiKeyManagement";
 
 function ProtectedRoute({ children, allowedRoles }: { children: React.ReactNode; allowedRoles?: string[] }) {
   const { user, isLoading } = useAuth();
@@ -149,6 +150,14 @@ function Router() {
         <ProtectedRoute allowedRoles={["tenant_admin"]}>
           <DashboardLayout>
             <WebhookManagement />
+          </DashboardLayout>
+        </ProtectedRoute>
+      </Route>
+
+      <Route path="/admin/api-keys">
+        <ProtectedRoute allowedRoles={["tenant_admin"]}>
+          <DashboardLayout>
+            <ApiKeyManagement />
           </DashboardLayout>
         </ProtectedRoute>
       </Route>

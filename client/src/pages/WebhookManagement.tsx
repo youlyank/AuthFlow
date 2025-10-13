@@ -86,11 +86,8 @@ export default function WebhookManagement() {
 
   const createMutation = useMutation({
     mutationFn: async (data: CreateWebhookInput) => {
-      const res = await apiRequest("/api/admin/webhooks", {
-        method: "POST",
-        body: JSON.stringify(data),
-      });
-      return res;
+      const res = await apiRequest("POST", "/api/admin/webhooks", data);
+      return res.json();
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/webhooks"] });
@@ -112,9 +109,7 @@ export default function WebhookManagement() {
 
   const deleteMutation = useMutation({
     mutationFn: async (id: string) => {
-      return apiRequest(`/api/admin/webhooks/${id}`, {
-        method: "DELETE",
-      });
+      return apiRequest("DELETE", `/api/admin/webhooks/${id}`);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/webhooks"] });
@@ -131,9 +126,8 @@ export default function WebhookManagement() {
 
   const regenerateSecretMutation = useMutation({
     mutationFn: async (id: string) => {
-      return apiRequest(`/api/admin/webhooks/${id}/regenerate-secret`, {
-        method: "POST",
-      });
+      const res = await apiRequest("POST", `/api/admin/webhooks/${id}/regenerate-secret`);
+      return res.json();
     },
     onSuccess: (data) => {
       setWebhookSecret(data.secret);
