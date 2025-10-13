@@ -35,6 +35,7 @@ import {
   Lock,
   History,
   Sparkles,
+  Webhook,
 } from "lucide-react";
 import { Logo } from "./Logo";
 import type { User } from "@shared/schema";
@@ -51,11 +52,6 @@ const superAdminItems = [
     icon: LayoutDashboard,
   },
   {
-    title: "🎯 22 Features Demo",
-    url: "/super-admin/features-demo",
-    icon: Sparkles,
-  },
-  {
     title: "Tenants",
     url: "/super-admin/tenants",
     icon: Building2,
@@ -64,6 +60,31 @@ const superAdminItems = [
     title: "Plans",
     url: "/super-admin/plans",
     icon: CreditCard,
+  },
+  {
+    title: "Webhooks",
+    url: "/admin/webhooks",
+    icon: Webhook,
+  },
+  {
+    title: "API Keys",
+    url: "/admin/api-keys",
+    icon: Key,
+  },
+  {
+    title: "OAuth2 Clients",
+    url: "/admin/oauth2-clients",
+    icon: Shield,
+  },
+  {
+    title: "Security",
+    url: "/security",
+    icon: Lock,
+  },
+  {
+    title: "🎯 Features Guide",
+    url: "/super-admin/features-demo",
+    icon: Sparkles,
   },
 ];
 
