@@ -108,6 +108,16 @@ const tenantAdminItems = [
     icon: Lock,
   },
   {
+    title: "Webhooks",
+    url: "/admin/webhooks",
+    icon: Bell,
+  },
+  {
+    title: "API Keys",
+    url: "/admin/api-keys",
+    icon: Key,
+  },
+  {
     title: "Analytics",
     url: "/admin/analytics",
     icon: BarChart3,

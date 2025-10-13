@@ -24,6 +24,7 @@ import TenantAdminSessions from "@/pages/TenantAdminSessions";
 import TenantAdminSettings from "@/pages/TenantAdminSettings";
 import UserDashboard from "@/pages/UserDashboard";
 import SecuritySettings from "@/pages/SecuritySettings";
+import WebhookManagement from "@/pages/WebhookManagement";
 
 function ProtectedRoute({ children, allowedRoles }: { children: React.ReactNode; allowedRoles?: string[] }) {
   const { user, isLoading } = useAuth();
@@ -140,6 +141,14 @@ function Router() {
         <ProtectedRoute allowedRoles={["tenant_admin"]}>
           <DashboardLayout>
             <TenantAdminSettings />
+          </DashboardLayout>
+        </ProtectedRoute>
+      </Route>
+
+      <Route path="/admin/webhooks">
+        <ProtectedRoute allowedRoles={["tenant_admin"]}>
+          <DashboardLayout>
+            <WebhookManagement />
           </DashboardLayout>
         </ProtectedRoute>
       </Route>
