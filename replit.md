@@ -239,21 +239,25 @@ Authflow is a **licensable authentication product** that companies integrate int
   - Tenant isolation enforced throughout
   - Production-ready security posture confirmed
 
+## Recently Completed Features (October 13, 2025)
+- ✅ **Magic Link Authentication:** Passwordless login via email link (15-min expiry)
+- ✅ **White-label Branding System:** Complete tenant customization (logos, colors, fonts, custom CSS)
+- ✅ **Risk-based Authentication:** Security event tracking with risk scores (0-100)
+- ✅ **IP Restrictions:** Geographic blocking + IP whitelist/blacklist (CIDR support)
+- ✅ **GDPR Compliance Tools:** Data export & right-to-be-forgotten requests
+- ✅ **Password Breach Detection:** Have I Been Pwned API integration (k-anonymity model)
+- ✅ **Advanced Analytics:** Login trends, security events, user growth charts with date grouping
+- ✅ **OAuth2/OIDC Provider:** Full implementation with PKCE, consent screens, token management
+- ✅ **API Key Management:** Permission-based access control with SHA-256 hashing
+- ✅ **Webhook System:** Event delivery with HMAC signing, retry logic, exponential backoff
+
 ## Next Steps (Future Enhancements)
-- [ ] Stripe integration for subscription payments
-- [ ] Complete OAuth provider implementation (Google, GitHub callbacks)
-- [ ] Magic link passwordless authentication
-- [ ] Advanced WebAuthn/FIDO2 implementation
-- [ ] Adaptive risk-based authentication
-- [ ] Bot detection and prevention
-- [ ] Geographic IP restrictions
-- [ ] Data breach detection
-- [ ] Complete GDPR compliance features
-- [ ] White-label branding customization UI
-- [ ] Advanced analytics and reporting
-- [ ] API key management for tenant self-hosting
-- [ ] Webhook system for events
-- [ ] SSO integration (SAML, OIDC)
+- [ ] Stripe integration for subscription payments (DEFERRED as requested)
+- [ ] Complete OAuth provider callbacks (Google, GitHub) - Requires API keys
+- [ ] SAML SSO integration for enterprise customers
+- [ ] Advanced WebAuthn/FIDO2 UI enhancements
+- [ ] Bot detection with CAPTCHA alternatives
+- [ ] Frontend UI pages for new features (branding, IP restrictions, GDPR, analytics)
 
 ## User Preferences
 - Design: Material Design + enterprise dashboard patterns

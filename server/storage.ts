@@ -25,6 +25,11 @@ import {
   oauth2RefreshTokens,
   webhooks,
   webhookDeliveries,
+  magicLinkTokens,
+  brandingCustomizations,
+  securityEvents,
+  ipRestrictions,
+  gdprRequests,
   type InsertUser,
   type InsertTenant,
   type InsertPlan,
@@ -1007,6 +1012,190 @@ export class DbStorage implements IStorage {
       .returning({ id: webhookDeliveries.id });
     
     return !!result;
+  }
+
+  // =======================
+  // MAGIC LINK METHODS
+  // =======================
+  
+  async createMagicLinkToken(data: any): Promise<any> {
+    const [token] = await db.insert(magicLinkTokens).values(data).returning();
+    return token;
+  }
+
+  async getMagicLinkToken(token: string): Promise<any> {
+    const [magicLink] = await db
+      .select()
+      .from(magicLinkTokens)
+      .where(eq(magicLinkTokens.token, token))
+      .limit(1);
+    return magicLink;
+  }
+
+  async markMagicLinkAsUsed(id: string): Promise<void> {
+    await db
+      .update(magicLinkTokens)
+      .set({ usedAt: new Date() })
+      .where(eq(magicLinkTokens.id, id));
+  }
+
+  // =======================
+  // BRANDING METHODS
+  // =======================
+  
+  async getBrandingByTenantId(tenantId: string): Promise<any> {
+    const [branding] = await db
+      .select()
+      .from(brandingCustomizations)
+      .where(eq(brandingCustomizations.tenantId, tenantId))
+      .limit(1);
+    return branding;
+  }
+
+  async upsertBranding(tenantId: string, data: any): Promise<any> {
+    // Try to update first
+    const [existing] = await db
+      .select()
+      .from(brandingCustomizations)
+      .where(eq(brandingCustomizations.tenantId, tenantId))
+      .limit(1);
+
+    if (existing) {
+      const [updated] = await db
+        .update(brandingCustomizations)
+        .set({ ...data, updatedAt: new Date() })
+        .where(eq(brandingCustomizations.tenantId, tenantId))
+        .returning();
+      return updated;
+    } else {
+      const [created] = await db
+        .insert(brandingCustomizations)
+        .values({ tenantId, ...data })
+        .returning();
+      return created;
+    }
+  }
+
+  // =======================
+  // SECURITY EVENT METHODS
+  // =======================
+  
+  async createSecurityEvent(data: any): Promise<any> {
+    const [event] = await db.insert(securityEvents).values(data).returning();
+    return event;
+  }
+
+  async getSecurityEvents(userId: string): Promise<any[]> {
+    return db
+      .select()
+      .from(securityEvents)
+      .where(eq(securityEvents.userId, userId))
+      .orderBy(desc(securityEvents.createdAt))
+      .limit(100);
+  }
+
+  // =======================
+  // IP RESTRICTION METHODS
+  // =======================
+  
+  async getIpRestrictions(tenantId: string): Promise<any[]> {
+    return db
+      .select()
+      .from(ipRestrictions)
+      .where(eq(ipRestrictions.tenantId, tenantId))
+      .orderBy(desc(ipRestrictions.createdAt));
+  }
+
+  async createIpRestriction(data: any): Promise<any> {
+    const [restriction] = await db.insert(ipRestrictions).values(data).returning();
+    return restriction;
+  }
+
+  async deleteIpRestriction(id: string): Promise<void> {
+    await db.delete(ipRestrictions).where(eq(ipRestrictions.id, id));
+  }
+
+  // =======================
+  // GDPR REQUEST METHODS
+  // =======================
+  
+  async createGdprRequest(data: any): Promise<any> {
+    const [request] = await db.insert(gdprRequests).values(data).returning();
+    return request;
+  }
+
+  async getGdprRequests(userId: string): Promise<any[]> {
+    return db
+      .select()
+      .from(gdprRequests)
+      .where(eq(gdprRequests.userId, userId))
+      .orderBy(desc(gdprRequests.requestedAt));
+  }
+
+  // =======================
+  // ADVANCED ANALYTICS
+  // =======================
+  
+  async getAdvancedAnalytics(tenantId: string | undefined, startDate: Date): Promise<any> {
+    // Get login history for the period
+    const loginHistoryData = await db
+      .select()
+      .from(loginHistory)
+      .where(
+        tenantId
+          ? sql`${loginHistory.createdAt} >= ${startDate}`
+          : sql`${loginHistory.createdAt} >= ${startDate}`
+      )
+      .orderBy(loginHistory.createdAt);
+
+    // Group by date
+    const loginsByDate: { [key: string]: number } = {};
+    loginHistoryData.forEach((login) => {
+      const date = login.createdAt.toISOString().split("T")[0];
+      loginsByDate[date] = (loginsByDate[date] || 0) + 1;
+    });
+
+    // Get security events
+    const securityEventData = await db
+      .select()
+      .from(securityEvents)
+      .where(sql`${securityEvents.createdAt} >= ${startDate}`)
+      .orderBy(securityEvents.createdAt);
+
+    // Group security events by type
+    const eventsByType: { [key: string]: number } = {};
+    securityEventData.forEach((event) => {
+      eventsByType[event.type] = (eventsByType[event.type] || 0) + 1;
+    });
+
+    // Get user growth
+    const userGrowth = await db
+      .select()
+      .from(users)
+      .where(
+        tenantId
+          ? and(
+              eq(users.tenantId, tenantId),
+              sql`${users.createdAt} >= ${startDate}`
+            )
+          : sql`${users.createdAt} >= ${startDate}`
+      )
+      .orderBy(users.createdAt);
+
+    const usersByDate: { [key: string]: number } = {};
+    userGrowth.forEach((user) => {
+      const date = user.createdAt.toISOString().split("T")[0];
+      usersByDate[date] = (usersByDate[date] || 0) + 1;
+    });
+
+    return {
+      loginsByDate,
+      eventsByType,
+      usersByDate,
+      totalLogins: loginHistoryData.length,
+      totalSecurityEvents: securityEventData.length,
+      totalNewUsers: userGrowth.length,
+    };
   }
 }
 

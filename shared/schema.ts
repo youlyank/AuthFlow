@@ -854,6 +854,235 @@ export const updateTenantSettingsSchema = z.object({
   features: z.record(z.boolean()).optional(),
 });
 
+// Magic Link Tokens (for passwordless authentication)
+export const magicLinkTokens = pgTable("magic_link_tokens", {
+  id: varchar("id")
+    .primaryKey()
+    .default(sql`gen_random_uuid()`),
+  userId: varchar("user_id")
+    .references(() => users.id, { onDelete: "cascade" }),
+  email: text("email").notNull(),
+  token: text("token").notNull().unique(),
+  expiresAt: timestamp("expires_at").notNull(),
+  usedAt: timestamp("used_at"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+// IP Restrictions (geographic and whitelist/blacklist)
+export const ipRestrictionTypeEnum = pgEnum("ip_restriction_type", [
+  "allow",
+  "block",
+]);
+
+export const ipRestrictions = pgTable(
+  "ip_restrictions",
+  {
+    id: varchar("id")
+      .primaryKey()
+      .default(sql`gen_random_uuid()`),
+    tenantId: varchar("tenant_id")
+      .notNull()
+      .references(() => tenants.id, { onDelete: "cascade" }),
+    type: ipRestrictionTypeEnum("type").notNull(),
+    ipAddress: text("ip_address"), // single IP or CIDR notation
+    countryCode: text("country_code"), // ISO 3166-1 alpha-2 code
+    description: text("description"),
+    isActive: boolean("is_active").notNull().default(true),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+  },
+  (table) => ({
+    tenantIdIdx: index("ip_restrictions_tenant_id_idx").on(table.tenantId),
+  }),
+);
+
+// Security Events (for risk-based authentication)
+export const securityEventTypeEnum = pgEnum("security_event_type", [
+  "suspicious_login",
+  "unusual_location",
+  "multiple_failed_attempts",
+  "password_breach_detected",
+  "unusual_device",
+  "unusual_time",
+  "velocity_check_failed",
+]);
+
+export const securityEvents = pgTable(
+  "security_events",
+  {
+    id: varchar("id")
+      .primaryKey()
+      .default(sql`gen_random_uuid()`),
+    userId: varchar("user_id")
+      .references(() => users.id, { onDelete: "cascade" }),
+    type: securityEventTypeEnum("type").notNull(),
+    riskScore: integer("risk_score").notNull().default(0), // 0-100
+    details: jsonb("details").notNull().default(sql`'{}'::jsonb`),
+    ipAddress: text("ip_address"),
+    location: text("location"),
+    resolved: boolean("resolved").notNull().default(false),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+  },
+  (table) => ({
+    userIdIdx: index("security_events_user_id_idx").on(table.userId),
+    createdAtIdx: index("security_events_created_at_idx").on(table.createdAt),
+  }),
+);
+
+// GDPR Data Export Requests
+export const gdprRequestTypeEnum = pgEnum("gdpr_request_type", [
+  "export",
+  "deletion",
+]);
+
+export const gdprRequestStatusEnum = pgEnum("gdpr_request_status", [
+  "pending",
+  "processing",
+  "completed",
+  "failed",
+]);
+
+export const gdprRequests = pgTable(
+  "gdpr_requests",
+  {
+    id: varchar("id")
+      .primaryKey()
+      .default(sql`gen_random_uuid()`),
+    userId: varchar("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    tenantId: varchar("tenant_id")
+      .references(() => tenants.id, { onDelete: "cascade" }),
+    type: gdprRequestTypeEnum("type").notNull(),
+    status: gdprRequestStatusEnum("status").notNull().default("pending"),
+    dataUrl: text("data_url"), // S3 URL for export data
+    requestedAt: timestamp("requested_at").notNull().defaultNow(),
+    completedAt: timestamp("completed_at"),
+    expiresAt: timestamp("expires_at"), // For export links
+  },
+  (table) => ({
+    userIdIdx: index("gdpr_requests_user_id_idx").on(table.userId),
+  }),
+);
+
+// SAML Configurations (for enterprise SSO)
+export const samlConfigurations = pgTable(
+  "saml_configurations",
+  {
+    id: varchar("id")
+      .primaryKey()
+      .default(sql`gen_random_uuid()`),
+    tenantId: varchar("tenant_id")
+      .notNull()
+      .references(() => tenants.id, { onDelete: "cascade" }),
+    entityId: text("entity_id").notNull(),
+    ssoUrl: text("sso_url").notNull(), // Identity Provider Single Sign-On URL
+    certificate: text("certificate").notNull(), // X.509 certificate
+    signRequests: boolean("sign_requests").notNull().default(false),
+    encryptAssertions: boolean("encrypt_assertions").notNull().default(false),
+    nameIdFormat: text("name_id_format")
+      .notNull()
+      .default("urn:oasis:names:tc:SAML:1.1:nameid-format:emailAddress"),
+    isActive: boolean("is_active").notNull().default(true),
+    metadata: jsonb("metadata").default(sql`'{}'::jsonb`),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+    updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  },
+  (table) => ({
+    tenantIdIdx: index("saml_configurations_tenant_id_idx").on(table.tenantId),
+  }),
+);
+
+// Branding Customization (white-label)
+export const brandingCustomizations = pgTable(
+  "branding_customizations",
+  {
+    id: varchar("id")
+      .primaryKey()
+      .default(sql`gen_random_uuid()`),
+    tenantId: varchar("tenant_id")
+      .notNull()
+      .references(() => tenants.id, { onDelete: "cascade" })
+      .unique(),
+    logoUrl: text("logo_url"),
+    faviconUrl: text("favicon_url"),
+    primaryColor: text("primary_color").default("#2563eb"),
+    secondaryColor: text("secondary_color").default("#64748b"),
+    accentColor: text("accent_color").default("#0ea5e9"),
+    fontFamily: text("font_family").default("Inter"),
+    customCss: text("custom_css"),
+    loginPageTitle: text("login_page_title"),
+    loginPageSubtitle: text("login_page_subtitle"),
+    emailFooter: text("email_footer"),
+    privacyPolicyUrl: text("privacy_policy_url"),
+    termsOfServiceUrl: text("terms_of_service_url"),
+    supportEmail: text("support_email"),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+    updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  },
+  (table) => ({
+    tenantIdIdx: index("branding_customizations_tenant_id_idx").on(
+      table.tenantId,
+    ),
+  }),
+);
+
+// Insert schemas for new tables
+export const insertMagicLinkTokenSchema = createInsertSchema(magicLinkTokens).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertIpRestrictionSchema = createInsertSchema(ipRestrictions).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertSecurityEventSchema = createInsertSchema(securityEvents).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertGdprRequestSchema = createInsertSchema(gdprRequests).omit({
+  id: true,
+  requestedAt: true,
+});
+
+export const insertSamlConfigSchema = createInsertSchema(samlConfigurations).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertBrandingCustomizationSchema = createInsertSchema(brandingCustomizations).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+// Select types for new tables
+export type MagicLinkToken = typeof magicLinkTokens.$inferSelect;
+export type IpRestriction = typeof ipRestrictions.$inferSelect;
+export type SecurityEvent = typeof securityEvents.$inferSelect;
+export type GdprRequest = typeof gdprRequests.$inferSelect;
+export type SamlConfiguration = typeof samlConfigurations.$inferSelect;
+export type BrandingCustomization = typeof brandingCustomizations.$inferSelect;
+
+// Insert types for new tables
+export type InsertMagicLinkToken = z.infer<typeof insertMagicLinkTokenSchema>;
+export type InsertIpRestriction = z.infer<typeof insertIpRestrictionSchema>;
+export type InsertSecurityEvent = z.infer<typeof insertSecurityEventSchema>;
+export type InsertGdprRequest = z.infer<typeof insertGdprRequestSchema>;
+export type InsertSamlConfig = z.infer<typeof insertSamlConfigSchema>;
+export type InsertBrandingCustomization = z.infer<typeof insertBrandingCustomizationSchema>;
+
+// Form schemas
+export const magicLinkRequestSchema = z.object({
+  email: z.string().email("Invalid email address"),
+  tenantSlug: z.string().optional(),
+});
+
+export type MagicLinkRequestInput = z.infer<typeof magicLinkRequestSchema>;
+
 export type RegisterInput = z.infer<typeof registerSchema>;
 export type LoginInput = z.infer<typeof loginSchema>;
 export type MfaVerifyInput = z.infer<typeof mfaVerifySchema>;

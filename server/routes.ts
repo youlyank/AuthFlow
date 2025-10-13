@@ -2298,5 +2298,420 @@ export async function registerRoutes(app: Express): Promise<Server> {
     });
   });
 
+  // =======================
+  // MAGIC LINK AUTHENTICATION
+  // =======================
+  
+  // Request Magic Link
+  app.post("/api/auth/magic-link/request", async (req: Request, res: Response) => {
+    try {
+      const { email, tenantSlug } = req.body;
+
+      // Tenant slug is REQUIRED for security (tenant isolation)
+      if (!tenantSlug) {
+        return res.status(400).json({ error: "tenantSlug is required" });
+      }
+
+      // Resolve tenant
+      const tenant = await storage.getTenantBySlug(tenantSlug);
+      if (!tenant) {
+        // Don't reveal if tenant exists
+        return res.json({ message: "If the email exists, a magic link has been sent" });
+      }
+
+      // Find user within tenant scope ONLY
+      const user = await storage.getUserByEmail(email, tenant.id);
+      if (!user) {
+        // Don't reveal if user exists
+        return res.json({ message: "If the email exists, a magic link has been sent" });
+      }
+
+      // Generate token
+      const token = randomBytes(32).toString("hex");
+      const expiresAt = new Date(Date.now() + 15 * 60 * 1000); // 15 minutes
+
+      await storage.createMagicLinkToken({
+        userId: user.id,
+        email,
+        token,
+        expiresAt,
+      });
+
+      // Send email with magic link
+      const baseUrl = `${req.protocol}://${req.get("host")}`;
+      await emailService.sendMagicLink(email, token, baseUrl);
+
+      // Note: audit log without req.user since user is not authenticated yet at this point
+
+      res.json({ message: "If the email exists, a magic link has been sent" });
+    } catch (error: any) {
+      console.error("Magic link request error:", error);
+      res.status(500).json({ error: "Failed to send magic link" });
+    }
+  });
+
+  // Verify Magic Link
+  app.post("/api/auth/magic-link/verify", async (req: Request, res: Response) => {
+    try {
+      const { token } = req.body;
+
+      const magicLink = await storage.getMagicLinkToken(token);
+      if (!magicLink || magicLink.usedAt) {
+        return res.status(400).json({ error: "Invalid or expired magic link" });
+      }
+
+      if (new Date() > magicLink.expiresAt) {
+        return res.status(400).json({ error: "Magic link has expired" });
+      }
+
+      const user = await storage.getUser(magicLink.userId!);
+      if (!user) {
+        return res.status(404).json({ error: "User not found" });
+      }
+
+      // Mark magic link as used
+      await storage.markMagicLinkAsUsed(magicLink.id);
+
+      // Generate auth tokens
+      const jwtToken = generateToken(user);
+      const refreshToken = generateRefreshToken();
+
+      // Create session
+      await storage.createSession({
+        userId: user.id,
+        token: jwtToken,
+        refreshToken,
+        ipAddress: req.ip,
+        userAgent: req.headers["user-agent"],
+        deviceType: req.headers["user-agent"]?.includes("Mobile") ? "mobile" : "desktop",
+        deviceName: req.headers["user-agent"]?.split(" ")[0],
+        isActive: true,
+        expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 days
+      });
+
+      // Set cookie
+      res.cookie("token", jwtToken, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === "production",
+        sameSite: "lax",
+        maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days
+      });
+
+      // Note: audit log without req.user since user is logging in at this point
+
+      res.json({
+        user: {
+          id: user.id,
+          email: user.email,
+          firstName: user.firstName,
+          lastName: user.lastName,
+          role: user.role,
+          tenantId: user.tenantId,
+        },
+        token: jwtToken,
+      });
+    } catch (error: any) {
+      console.error("Magic link verify error:", error);
+      res.status(500).json({ error: "Failed to verify magic link" });
+    }
+  });
+
+  // =======================
+  // BRANDING CUSTOMIZATION
+  // =======================
+  
+  // Get Branding for Tenant
+  app.get("/api/branding/:tenantId", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const { tenantId } = req.params;
+      
+      // Only super_admin or users from same tenant can view branding
+      if (req.user.role !== "super_admin" && req.user.tenantId !== tenantId) {
+        return res.status(403).json({ error: "Forbidden" });
+      }
+      
+      const branding = await storage.getBrandingByTenantId(tenantId);
+      res.json(branding || {});
+    } catch (error: any) {
+      console.error("Get branding error:", error);
+      res.status(500).json({ error: "Failed to get branding" });
+    }
+  });
+
+  // Update Branding
+  app.put("/api/branding/:tenantId", requireAuth, requireRole(["super_admin", "tenant_admin"]), async (req: Request, res: Response) => {
+    try {
+      const { tenantId } = req.params;
+      const brandingData = req.body;
+
+      // Super admins can update any tenant, tenant admins only their own
+      if (req.user.role === "tenant_admin" && req.user.tenantId !== tenantId) {
+        return res.status(403).json({ error: "Forbidden: Can only update your own tenant's branding" });
+      }
+
+      const branding = await storage.upsertBranding(tenantId, brandingData);
+
+      await auditLog(req, "branding_updated", "branding", branding.id, brandingData);
+
+      res.json(branding);
+    } catch (error: any) {
+      console.error("Update branding error:", error);
+      res.status(500).json({ error: "Failed to update branding" });
+    }
+  });
+
+  // =======================
+  // SECURITY EVENTS & RISK ASSESSMENT
+  // =======================
+  
+  // Get Security Events
+  app.get("/api/security-events", requireAuth, async (req: Request, res: Response) => {
+    try {
+      let userId: string;
+      
+      if (req.user.role === "user") {
+        // Regular users can only see their own events
+        userId = req.user.id;
+      } else {
+        // Admins can query specific user, but must verify tenant access
+        const requestedUserId = req.query.userId as string;
+        if (requestedUserId) {
+          const targetUser = await storage.getUser(requestedUserId);
+          if (!targetUser) {
+            return res.status(404).json({ error: "User not found" });
+          }
+          // Tenant admins can only view users in their tenant
+          if (req.user.role === "tenant_admin" && targetUser.tenantId !== req.user.tenantId) {
+            return res.status(403).json({ error: "Forbidden" });
+          }
+          userId = requestedUserId;
+        } else {
+          userId = req.user.id;
+        }
+      }
+      
+      const events = await storage.getSecurityEvents(userId);
+      res.json(events);
+    } catch (error: any) {
+      console.error("Get security events error:", error);
+      res.status(500).json({ error: "Failed to get security events" });
+    }
+  });
+
+  // Create Security Event (internal use)
+  async function createSecurityEvent(
+    userId: string | null,
+    type: string,
+    riskScore: number,
+    details: any,
+    req: Request
+  ) {
+    try {
+      await storage.createSecurityEvent({
+        userId,
+        type,
+        riskScore,
+        details,
+        ipAddress: req.ip,
+        location: req.headers["cf-ipcountry"] as string || "Unknown",
+        resolved: false,
+      });
+    } catch (error) {
+      console.error("Failed to create security event:", error);
+    }
+  }
+
+  // =======================
+  // IP RESTRICTIONS
+  // =======================
+  
+  // Get IP Restrictions
+  app.get("/api/ip-restrictions", requireAuth, requireRole(["super_admin", "tenant_admin"]), async (req: Request, res: Response) => {
+    try {
+      let tenantId: string;
+      
+      if (req.user.role === "super_admin") {
+        // Super admin can query any tenant, but must provide tenantId
+        tenantId = req.query.tenantId as string;
+        if (!tenantId) {
+          return res.status(400).json({ error: "tenantId required for super admin" });
+        }
+      } else {
+        // Tenant admin can only view their own tenant's restrictions
+        tenantId = req.user.tenantId!;
+      }
+      
+      const restrictions = await storage.getIpRestrictions(tenantId);
+      res.json(restrictions);
+    } catch (error: any) {
+      console.error("Get IP restrictions error:", error);
+      res.status(500).json({ error: "Failed to get IP restrictions" });
+    }
+  });
+
+  // Create IP Restriction
+  app.post("/api/ip-restrictions", requireAuth, requireRole(["super_admin", "tenant_admin"]), async (req: Request, res: Response) => {
+    try {
+      let tenantId: string;
+      
+      if (req.user.role === "super_admin") {
+        // Super admin can create for any tenant
+        tenantId = req.body.tenantId;
+        if (!tenantId) {
+          return res.status(400).json({ error: "tenantId required for super admin" });
+        }
+      } else {
+        // Tenant admin can only create for their own tenant
+        tenantId = req.user.tenantId!;
+      }
+      
+      const restrictionData = { ...req.body, tenantId };
+
+      const restriction = await storage.createIpRestriction(restrictionData);
+
+      await auditLog(req, "ip_restriction_created", "ip_restriction", restriction.id, restrictionData);
+
+      res.json(restriction);
+    } catch (error: any) {
+      console.error("Create IP restriction error:", error);
+      res.status(500).json({ error: "Failed to create IP restriction" });
+    }
+  });
+
+  // Delete IP Restriction
+  app.delete("/api/ip-restrictions/:id", requireAuth, requireRole(["super_admin", "tenant_admin"]), async (req: Request, res: Response) => {
+    try {
+      const { id } = req.params;
+      await storage.deleteIpRestriction(id);
+
+      await auditLog(req, "ip_restriction_deleted", "ip_restriction", id);
+
+      res.json({ message: "IP restriction deleted" });
+    } catch (error: any) {
+      console.error("Delete IP restriction error:", error);
+      res.status(500).json({ error: "Failed to delete IP restriction" });
+    }
+  });
+
+  // =======================
+  // GDPR COMPLIANCE
+  // =======================
+  
+  // Request Data Export
+  app.post("/api/gdpr/export", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const userId = req.user.id;
+
+      const gdprRequest = await storage.createGdprRequest({
+        userId,
+        tenantId: req.user.tenantId,
+        type: "export",
+        status: "pending",
+      });
+
+      await auditLog(req, "gdpr_export_requested", "gdpr_request", gdprRequest.id);
+
+      res.json({ message: "Data export requested. You will receive an email when ready.", requestId: gdprRequest.id });
+    } catch (error: any) {
+      console.error("GDPR export error:", error);
+      res.status(500).json({ error: "Failed to request data export" });
+    }
+  });
+
+  // Request Account Deletion
+  app.post("/api/gdpr/delete", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const userId = req.user.id;
+
+      const gdprRequest = await storage.createGdprRequest({
+        userId,
+        tenantId: req.user.tenantId,
+        type: "deletion",
+        status: "pending",
+      });
+
+      await auditLog(req, "gdpr_deletion_requested", "gdpr_request", gdprRequest.id);
+
+      res.json({ message: "Account deletion requested. This will be processed within 30 days.", requestId: gdprRequest.id });
+    } catch (error: any) {
+      console.error("GDPR deletion error:", error);
+      res.status(500).json({ error: "Failed to request account deletion" });
+    }
+  });
+
+  // Get GDPR Requests
+  app.get("/api/gdpr/requests", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const userId = req.user.id;
+      const requests = await storage.getGdprRequests(userId);
+      res.json(requests);
+    } catch (error: any) {
+      console.error("Get GDPR requests error:", error);
+      res.status(500).json({ error: "Failed to get GDPR requests" });
+    }
+  });
+
+  // =======================
+  // PASSWORD BREACH DETECTION
+  // =======================
+  
+  // Check if password has been breached (using k-anonymity with Have I Been Pwned)
+  app.post("/api/auth/check-password-breach", async (req: Request, res: Response) => {
+    try {
+      const { password } = req.body;
+
+      // Hash password with SHA-1
+      const hash = createHash("sha1").update(password).digest("hex").toUpperCase();
+      const prefix = hash.substring(0, 5);
+      const suffix = hash.substring(5);
+
+      // Query Have I Been Pwned API (k-anonymity model)
+      const response = await fetch(`https://api.pwnedpasswords.com/range/${prefix}`);
+      const data = await response.text();
+
+      // Check if our hash suffix appears in the results
+      const breached = data.split("\n").some(line => line.startsWith(suffix));
+
+      res.json({ breached, safe: !breached });
+    } catch (error: any) {
+      console.error("Password breach check error:", error);
+      // Fail open - don't block registration if API is down
+      res.json({ breached: false, safe: true, error: "Unable to check at this time" });
+    }
+  });
+
+  // =======================
+  // ADVANCED ANALYTICS
+  // =======================
+  
+  // Get Advanced Analytics
+  app.get("/api/analytics/advanced", requireAuth, requireRole(["super_admin", "tenant_admin"]), async (req: Request, res: Response) => {
+    try {
+      let tenantId: string | undefined;
+      
+      if (req.user.role === "super_admin") {
+        // Super admin can query any tenant or platform-wide
+        tenantId = req.query.tenantId as string | undefined;
+      } else {
+        // Tenant admin can only view their own tenant
+        tenantId = req.user.tenantId!;
+      }
+      
+      const period = (req.query.period as string) || "30d";
+
+      // Calculate date range
+      const daysBack = period === "7d" ? 7 : period === "30d" ? 30 : 90;
+      const startDate = new Date();
+      startDate.setDate(startDate.getDate() - daysBack);
+
+      const analytics = await storage.getAdvancedAnalytics(tenantId, startDate);
+
+      res.json(analytics);
+    } catch (error: any) {
+      console.error("Get advanced analytics error:", error);
+      res.status(500).json({ error: "Failed to get analytics" });
+    }
+  });
+
   return httpServer;
 }
