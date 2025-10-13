@@ -118,6 +118,11 @@ const tenantAdminItems = [
     icon: Key,
   },
   {
+    title: "OAuth2 Clients",
+    url: "/admin/oauth2-clients",
+    icon: Shield,
+  },
+  {
     title: "Analytics",
     url: "/admin/analytics",
     icon: BarChart3,

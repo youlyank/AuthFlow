@@ -1772,6 +1772,92 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // ===== OAuth2/OIDC Provider Endpoints =====
 
+  // Sanitize OAuth2 client for API response (whitelist approach)
+  function sanitizeOAuth2Client(client: any): any {
+    return {
+      id: client.id,
+      clientId: client.clientId,
+      name: client.name,
+      description: client.description,
+      redirectUris: client.redirectUris,
+      tenantId: client.tenantId,
+    };
+  }
+
+  // Create OAuth2 Client
+  app.post("/api/admin/oauth2/clients", requireAuth, requireRole(["tenant_admin"]), async (req: Request, res: Response) => {
+    try {
+      // Validate tenantId exists
+      if (!req.user.tenantId) {
+        return res.status(403).json({ error: "Tenant ID required" });
+      }
+
+      const { name, redirectUris, description } = req.body;
+
+      if (!name || !redirectUris || !Array.isArray(redirectUris) || redirectUris.length === 0) {
+        return res.status(400).json({ error: "Name and at least one redirect URI are required" });
+      }
+
+      const clientId = randomBytes(16).toString("hex");
+      const clientSecret = randomBytes(32).toString("hex");
+      const clientSecretHash = hashOAuth2Secret(clientSecret);
+
+      const client = await storage.createOAuth2Client({
+        clientId,
+        clientSecretHash,
+        name,
+        description: description || null,
+        redirectUris,
+        tenantId: req.user.tenantId,
+      });
+
+      // Return sanitized client + one-time secret
+      res.json({
+        ...sanitizeOAuth2Client(client),
+        clientSecret, // Return plaintext secret only on creation
+      });
+    } catch (error: any) {
+      console.error("Error creating OAuth2 client:", error);
+      res.status(500).json({ error: "Failed to create OAuth2 client" });
+    }
+  });
+
+  // List OAuth2 Clients
+  app.get("/api/admin/oauth2/clients", requireAuth, requireRole(["tenant_admin"]), async (req: Request, res: Response) => {
+    try {
+      // Validate tenantId exists
+      if (!req.user.tenantId) {
+        return res.status(403).json({ error: "Tenant ID required" });
+      }
+
+      const clients = await storage.listOAuth2Clients(req.user.tenantId);
+      
+      // Sanitize all clients using whitelist
+      const sanitizedClients = clients.map(sanitizeOAuth2Client);
+      
+      res.json(sanitizedClients);
+    } catch (error: any) {
+      console.error("Error listing OAuth2 clients:", error);
+      res.status(500).json({ error: "Failed to list OAuth2 clients" });
+    }
+  });
+
+  // Delete OAuth2 Client
+  app.delete("/api/admin/oauth2/clients/:id", requireAuth, requireRole(["tenant_admin"]), async (req: Request, res: Response) => {
+    try {
+      // Validate tenantId exists
+      if (!req.user.tenantId) {
+        return res.status(403).json({ error: "Tenant ID required" });
+      }
+
+      await storage.deleteOAuth2Client(req.params.id, req.user.tenantId);
+      res.json({ success: true });
+    } catch (error: any) {
+      console.error("Error deleting OAuth2 client:", error);
+      res.status(500).json({ error: "Failed to delete OAuth2 client" });
+    }
+  });
+
   // OAuth2 Authorization Endpoint - Redirects to consent screen
   app.get("/oauth2/authorize", requireAuth, async (req: Request, res: Response) => {
     try {

@@ -27,6 +27,7 @@ import SecuritySettings from "@/pages/SecuritySettings";
 import WebhookManagement from "@/pages/WebhookManagement";
 import ApiKeyManagement from "@/pages/ApiKeyManagement";
 import OAuth2ConsentPage from "@/pages/OAuth2ConsentPage";
+import OAuth2ClientManagement from "@/pages/OAuth2ClientManagement";
 
 function ProtectedRoute({ children, allowedRoles }: { children: React.ReactNode; allowedRoles?: string[] }) {
   const { user, isLoading } = useAuth();
@@ -166,6 +167,14 @@ function Router() {
         <ProtectedRoute allowedRoles={["tenant_admin"]}>
           <DashboardLayout>
             <ApiKeyManagement />
+          </DashboardLayout>
+        </ProtectedRoute>
+      </Route>
+
+      <Route path="/admin/oauth2-clients">
+        <ProtectedRoute allowedRoles={["tenant_admin"]}>
+          <DashboardLayout>
+            <OAuth2ClientManagement />
           </DashboardLayout>
         </ProtectedRoute>
       </Route>
