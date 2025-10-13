@@ -11,6 +11,7 @@ import { NotificationCenter } from "@/components/NotificationCenter";
 import { ThemeToggle } from "@/components/ThemeToggle";
 
 import NotFound from "@/pages/not-found";
+import LandingPage from "@/pages/LandingPage";
 import LoginPage from "@/pages/LoginPage";
 import RegisterPage from "@/pages/RegisterPage";
 import MfaVerifyPage from "@/pages/MfaVerifyPage";
@@ -88,7 +89,7 @@ function DashboardLayout({ children }: { children: React.ReactNode }) {
   );
 }
 
-function DefaultRedirect() {
+function LandingOrDashboard() {
   const { user, isLoading } = useAuth();
   
   if (isLoading) {
@@ -99,11 +100,12 @@ function DefaultRedirect() {
     );
   }
   
+  // Show landing page for non-authenticated users
   if (!user) {
-    return <Redirect to="/auth/login" />;
+    return <LandingPage />;
   }
   
-  // Redirect based on role
+  // Redirect authenticated users to their dashboard based on role
   if (user.role === "super_admin") {
     return <Redirect to="/super-admin" />;
   } else if (user.role === "tenant_admin") {
@@ -116,9 +118,11 @@ function DefaultRedirect() {
 function Router() {
   return (
     <Switch>
-      {/* Auth routes */}
+      {/* Auth routes - also alias without /auth prefix */}
       <Route path="/auth/login" component={LoginPage} />
+      <Route path="/login" component={LoginPage} />
       <Route path="/auth/register" component={RegisterPage} />
+      <Route path="/register" component={RegisterPage} />
       <Route path="/auth/mfa" component={MfaVerifyPage} />
       <Route path="/auth/forgot-password" component={ForgotPasswordPage} />
 
@@ -226,9 +230,9 @@ function Router() {
         </ProtectedRoute>
       </Route>
 
-      {/* Default redirect - smart routing based on auth */}
+      {/* Landing page with smart redirect for authenticated users */}
       <Route path="/">
-        <DefaultRedirect />
+        <LandingOrDashboard />
       </Route>
 
       {/* 404 */}
