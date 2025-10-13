@@ -83,9 +83,10 @@ export default function TenantAdminDashboard() {
           icon={Activity}
         />
         <StatsCard
-          title="Avg Session Time"
-          value="24m"
-          icon={Clock}
+          title="MFA Adoption"
+          value={`${stats?.mfaAdoption || 0}%`}
+          icon={Shield}
+          description="Users with MFA enabled"
         />
       </div>
 
