@@ -34,6 +34,7 @@ import {
   CreditCard,
   Lock,
   History,
+  Sparkles,
 } from "lucide-react";
 import { Logo } from "./Logo";
 import type { User } from "@shared/schema";
@@ -48,6 +49,11 @@ const superAdminItems = [
     title: "Overview",
     url: "/super-admin",
     icon: LayoutDashboard,
+  },
+  {
+    title: "🎯 22 Features Demo",
+    url: "/super-admin/features-demo",
+    icon: Sparkles,
   },
   {
     title: "Tenants",

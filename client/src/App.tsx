@@ -29,6 +29,7 @@ import WebhookManagement from "@/pages/WebhookManagement";
 import ApiKeyManagement from "@/pages/ApiKeyManagement";
 import OAuth2ConsentPage from "@/pages/OAuth2ConsentPage";
 import OAuth2ClientManagement from "@/pages/OAuth2ClientManagement";
+import FeaturesDemoPage from "@/pages/FeaturesDemoPage";
 
 function ProtectedRoute({ children, allowedRoles }: { children: React.ReactNode; allowedRoles?: string[] }) {
   const { user, isLoading } = useAuth();
@@ -154,6 +155,14 @@ function Router() {
         <ProtectedRoute allowedRoles={["super_admin"]}>
           <DashboardLayout>
             <SuperAdminPlans />
+          </DashboardLayout>
+        </ProtectedRoute>
+      </Route>
+
+      <Route path="/super-admin/features-demo">
+        <ProtectedRoute allowedRoles={["super_admin"]}>
+          <DashboardLayout>
+            <FeaturesDemoPage />
           </DashboardLayout>
         </ProtectedRoute>
       </Route>
