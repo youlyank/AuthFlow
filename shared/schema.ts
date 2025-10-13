@@ -455,6 +455,111 @@ export const apiKeys = pgTable(
   }),
 );
 
+// OAuth2 Clients (apps that use Authflow as identity provider)
+export const oauth2Clients = pgTable(
+  "oauth2_clients",
+  {
+    id: varchar("id")
+      .primaryKey()
+      .default(sql`gen_random_uuid()`),
+    tenantId: varchar("tenant_id").references(() => tenants.id, {
+      onDelete: "cascade",
+    }),
+    name: text("name").notNull(),
+    clientId: text("client_id").notNull().unique(),
+    clientSecretHash: text("client_secret_hash").notNull(), // Hashed secret, never store plaintext!
+    redirectUris: text("redirect_uris").array().notNull().default(sql`ARRAY[]::text[]`),
+    grantTypes: text("grant_types").array().notNull().default(sql`ARRAY['authorization_code']::text[]`),
+    responseTypes: text("response_types").array().notNull().default(sql`ARRAY['code']::text[]`),
+    scopes: text("scopes").array().notNull().default(sql`ARRAY['openid', 'profile', 'email']::text[]`),
+    isActive: boolean("is_active").notNull().default(true),
+    logoUri: text("logo_uri"),
+    policyUri: text("policy_uri"),
+    tosUri: text("tos_uri"),
+    createdBy: varchar("created_by").references(() => users.id, {
+      onDelete: "set null",
+    }),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+    updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  },
+  (table) => ({
+    tenantIdIdx: index("oauth2_clients_tenant_id_idx").on(table.tenantId),
+    clientIdIdx: index("oauth2_clients_client_id_idx").on(table.clientId),
+  }),
+);
+
+// OAuth2 Authorization Codes
+export const oauth2AuthorizationCodes = pgTable(
+  "oauth2_authorization_codes",
+  {
+    id: varchar("id")
+      .primaryKey()
+      .default(sql`gen_random_uuid()`),
+    codeHash: text("code_hash").notNull().unique(), // Hash of the actual code
+    clientId: text("client_id").notNull(), // Public client ID, not UUID
+    userId: varchar("user_id").references(() => users.id, {
+      onDelete: "cascade",
+    }),
+    redirectUri: text("redirect_uri").notNull(),
+    scopes: text("scopes").array().notNull().default(sql`ARRAY[]::text[]`),
+    codeChallenge: text("code_challenge"),
+    codeChallengeMethod: text("code_challenge_method"),
+    expiresAt: timestamp("expires_at").notNull(),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+  },
+  (table) => ({
+    codeHashIdx: index("oauth2_authorization_codes_code_hash_idx").on(table.codeHash),
+    clientIdIdx: index("oauth2_authorization_codes_client_id_idx").on(table.clientId),
+  }),
+);
+
+// OAuth2 Access Tokens
+export const oauth2AccessTokens = pgTable(
+  "oauth2_access_tokens",
+  {
+    id: varchar("id")
+      .primaryKey()
+      .default(sql`gen_random_uuid()`),
+    tokenHash: text("token_hash").notNull().unique(), // Hash of the actual token
+    clientId: text("client_id").notNull(), // Public client ID, not UUID
+    userId: varchar("user_id").references(() => users.id, {
+      onDelete: "cascade",
+    }),
+    scopes: text("scopes").array().notNull().default(sql`ARRAY[]::text[]`),
+    expiresAt: timestamp("expires_at").notNull(),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+  },
+  (table) => ({
+    tokenHashIdx: index("oauth2_access_tokens_token_hash_idx").on(table.tokenHash),
+    clientIdIdx: index("oauth2_access_tokens_client_id_idx").on(table.clientId),
+  }),
+);
+
+// OAuth2 Refresh Tokens
+export const oauth2RefreshTokens = pgTable(
+  "oauth2_refresh_tokens",
+  {
+    id: varchar("id")
+      .primaryKey()
+      .default(sql`gen_random_uuid()`),
+    tokenHash: text("token_hash").notNull().unique(), // Hash of the actual token
+    accessTokenId: varchar("access_token_id").references(() => oauth2AccessTokens.id, {
+      onDelete: "cascade",
+    }),
+    clientId: text("client_id").notNull(), // Public client ID, not UUID
+    userId: varchar("user_id").references(() => users.id, {
+      onDelete: "cascade",
+    }),
+    scopes: text("scopes").array().notNull().default(sql`ARRAY[]::text[]`),
+    expiresAt: timestamp("expires_at").notNull(),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+  },
+  (table) => ({
+    tokenHashIdx: index("oauth2_refresh_tokens_token_hash_idx").on(table.tokenHash),
+    clientIdIdx: index("oauth2_refresh_tokens_client_id_idx").on(table.clientId),
+  }),
+);
+
 // Insert Schemas
 export const insertTenantSchema = createInsertSchema(tenants).omit({
   id: true,
@@ -522,6 +627,23 @@ export const insertApiKeySchema = createInsertSchema(apiKeys).omit({
   id: true,
   createdAt: true,
 });
+export const insertOAuth2ClientSchema = createInsertSchema(oauth2Clients).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export const insertOAuth2AuthorizationCodeSchema = createInsertSchema(oauth2AuthorizationCodes).omit({
+  id: true,
+  createdAt: true,
+});
+export const insertOAuth2AccessTokenSchema = createInsertSchema(oauth2AccessTokens).omit({
+  id: true,
+  createdAt: true,
+});
+export const insertOAuth2RefreshTokenSchema = createInsertSchema(oauth2RefreshTokens).omit({
+  id: true,
+  createdAt: true,
+});
 
 // Insert Types
 export type InsertTenant = z.infer<typeof insertTenantSchema>;
@@ -549,6 +671,10 @@ export type InsertNotificationRead = z.infer<
 >;
 export type InsertRateLimit = z.infer<typeof insertRateLimitSchema>;
 export type InsertApiKey = z.infer<typeof insertApiKeySchema>;
+export type InsertOAuth2Client = z.infer<typeof insertOAuth2ClientSchema>;
+export type InsertOAuth2AuthorizationCode = z.infer<typeof insertOAuth2AuthorizationCodeSchema>;
+export type InsertOAuth2AccessToken = z.infer<typeof insertOAuth2AccessTokenSchema>;
+export type InsertOAuth2RefreshToken = z.infer<typeof insertOAuth2RefreshTokenSchema>;
 
 // Select Types
 export type Tenant = typeof tenants.$inferSelect;
@@ -569,6 +695,10 @@ export type Notification = typeof notifications.$inferSelect;
 export type NotificationRead = typeof notificationReads.$inferSelect;
 export type RateLimit = typeof rateLimits.$inferSelect;
 export type ApiKey = typeof apiKeys.$inferSelect;
+export type OAuth2Client = typeof oauth2Clients.$inferSelect;
+export type OAuth2AuthorizationCode = typeof oauth2AuthorizationCodes.$inferSelect;
+export type OAuth2AccessToken = typeof oauth2AccessTokens.$inferSelect;
+export type OAuth2RefreshToken = typeof oauth2RefreshTokens.$inferSelect;
 
 // Extended schemas for forms
 export const registerSchema = z.object({

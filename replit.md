@@ -190,6 +190,11 @@ Authflow is a **licensable authentication product** that companies integrate int
   - User Security Settings page for MFA management
   - Trusted device listing and removal functionality
   - Auto-invalidation of expired trusted devices
+- ✅ Built OAuth2/OIDC Provider foundation (in progress):
+  - Created OAuth2 database schema (clients, authorization codes, tokens)
+  - Implemented storage layer for OAuth2 operations
+  - Ready for OAuth2 endpoint implementation
+  - Next: Build authorization, token, userinfo, JWKS, discovery endpoints
 
 ## Next Steps (Future Enhancements)
 - [ ] Stripe integration for subscription payments
