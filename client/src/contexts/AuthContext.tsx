@@ -40,6 +40,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       return res.json();
     },
     onSuccess: (data) => {
+      // Store token in localStorage as backup for cookie issues
+      if (data.token) {
+        localStorage.setItem("auth_token", data.token);
+      }
       // Set user immediately and update cache without refetching
       setUser(data.user);
       queryClient.setQueryData(["/api/auth/me"], { user: data.user });
@@ -55,6 +59,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (!res.ok) throw new Error("Logout failed");
     },
     onSuccess: () => {
+      localStorage.removeItem("auth_token");
       setUser(null);
       queryClient.clear();
     },
