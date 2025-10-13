@@ -121,6 +121,13 @@ Authflow is a **licensable authentication product** that companies integrate int
 - Sessions are tracked with device information
 - All sensitive operations are logged in audit_logs
 
+**OAuth2/OIDC Provider Security:**
+- All OAuth2 client secrets stored as SHA-256 hashes (never plaintext)
+- Authorization codes and tokens stored as hashes for security
+- Tenant isolation enforced on all OAuth2 operations
+- Automatic expiry checking on all token lookups
+- Cleanup methods available to purge expired tokens/codes
+
 ## API Endpoints
 **Authentication:**
 - POST `/api/auth/register` - User registration
@@ -190,11 +197,15 @@ Authflow is a **licensable authentication product** that companies integrate int
   - User Security Settings page for MFA management
   - Trusted device listing and removal functionality
   - Auto-invalidation of expired trusted devices
-- ✅ Built OAuth2/OIDC Provider foundation (in progress):
+- ✅ Built OAuth2/OIDC Provider foundation with enterprise security:
   - Created OAuth2 database schema (clients, authorization codes, tokens)
-  - Implemented storage layer for OAuth2 operations
-  - Ready for OAuth2 endpoint implementation
-  - Next: Build authorization, token, userinfo, JWKS, discovery endpoints
+  - Implemented hash-based storage (SHA-256) for all secrets and tokens
+  - Fixed foreign keys to use public clientId instead of internal UUIDs
+  - Added tenant isolation to all OAuth2 operations
+  - Implemented automatic expiry checking and cleanup methods
+  - Added crypto utilities for secure token generation
+  - **Security Status:** Architect-reviewed and approved ✅
+  - Next: Build OAuth2 endpoints (authorize, token, userinfo, JWKS, discovery)
 
 ## Next Steps (Future Enhancements)
 - [ ] Stripe integration for subscription payments
