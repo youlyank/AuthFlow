@@ -1,0 +1,37 @@
+Authflow plan to include the comprehensive Notifier Add-On/Push Module with all the features you've specified. Let me incorporate these notification capabilities into the platform.
+App type ®
+Modern web app
+Integrations ® Basic Username/Password Authentication
+PostgreSQL database
+Stripe
+Real-time communication (WebSockets)
+
+Authflow - A comprehensive multi-tenant authentication SaaS with Starter/Pro tiers, enterprise features, super admin controls, and integrated Notifier Add-On for push notifications and announcements which is build to replace auth0, okta & keyclock 
+I'll include the following features:
+*   Multi-tenant architecture with tenant_id isolation in PostgreSQL database
+*   Email/password authentication with JWT (access + refresh tokens) and Redis session management
+*   Password reset via email OTP and email verification during signup
+*   Google and GitHub OAuth2 social login integration
+*   Multi-factor authentication (MFA) with email OTP and authenticator app (TOTP) support
+*   Role-based access control (RBAC) with Super Admin, Tenant Admin, and User roles with fine-grained permissions
+*   Super Admin dashboard: monitor all tenants, manage plans, revoke API keys, view platform-wide analytics
+*   Plan enforcement: Starter (max 50 users) and Pro (max 500 users) with strict API/dashboard limits
+*   Stripe payment integration for recurring subscription billing and plan upgrades/downgrades
+*   OAuth2/OIDC provider functionality allowing external apps to use 'Login with Authflow'
+*   API key/license system for enterprise self-hosting with validation and expiration tracking
+*   Tenant admin dashboard: manage users (create/edit/delete), assign roles, view active sessions
+*   Login history and audit logs tracking login times, IP addresses, user actions, and security events
+*   Session revocation and device management allowing admins to terminate active
+* sessions
+*   Rate limiting and security protections against brute-force attacks and API misuse
+*   Notifier Module: in-app dashboard notifications with real-time updates and notification center
+*   Targeted notifications: send to entire tenant, specific roles (Admin/User), or individual users
+*   Notification types: system updates, marketing messages, security alerts, announcements
+*   Notification scheduling and queueing system to prevent spikes and ensure reliable delivery
+*   Read/seen tracking for notifications with user engagement analytics
+*   Branded notifications carrying tenant logos and custom colors for consistency
+*   Email notifications for critical updates alongside in-app notifications
+*   Notification API endpoints allowing external apps to trigger notifications
+*   Super Admin controls: push to all tenants or selected tenant groups with full audit log
+*   Tenant Admin controls: push notifications to own users only with permission restrictions
+*   Analytics dashboard with charts: active users, login metrics, usage by tenant, notification engagement
