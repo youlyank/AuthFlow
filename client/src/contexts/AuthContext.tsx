@@ -34,6 +34,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email, password }),
+        credentials: "include",
       });
       if (!res.ok) throw new Error("Login failed");
       return res.json();
@@ -46,7 +47,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const logoutMutation = useMutation({
     mutationFn: async () => {
-      const res = await fetch("/api/auth/logout", { method: "POST" });
+      const res = await fetch("/api/auth/logout", { 
+        method: "POST",
+        credentials: "include"
+      });
       if (!res.ok) throw new Error("Logout failed");
     },
     onSuccess: () => {
