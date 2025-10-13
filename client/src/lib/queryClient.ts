@@ -3,6 +3,11 @@ import { QueryClient, QueryFunction } from "@tanstack/react-query";
 async function throwIfResNotOk(res: Response) {
   if (!res.ok) {
     const text = (await res.text()) || res.statusText;
+    // Don't clear auth on non-401 errors
+    if (res.status === 401) {
+      // Only clear token if auth actually failed, not on network errors
+      localStorage.removeItem("auth_token");
+    }
     throw new Error(`${res.status}: ${text}`);
   }
 }

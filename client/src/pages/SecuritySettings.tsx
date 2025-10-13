@@ -48,6 +48,7 @@ export default function SecuritySettings() {
   const { data: trustedDevices = [], isLoading: devicesLoading } = useQuery<TrustedDevice[]>({
     queryKey: ["/api/user/trusted-devices"],
     enabled: user?.mfaEnabled && user?.mfaMethod === "email",
+    retry: false,
   });
 
   // Enable Email OTP mutation
