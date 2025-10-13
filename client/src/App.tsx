@@ -16,6 +16,8 @@ import RegisterPage from "@/pages/RegisterPage";
 import MfaVerifyPage from "@/pages/MfaVerifyPage";
 import ForgotPasswordPage from "@/pages/ForgotPasswordPage";
 import SuperAdminDashboard from "@/pages/SuperAdminDashboard";
+import SuperAdminTenants from "@/pages/SuperAdminTenants";
+import SuperAdminPlans from "@/pages/SuperAdminPlans";
 import TenantAdminDashboard from "@/pages/TenantAdminDashboard";
 import UserDashboard from "@/pages/UserDashboard";
 
@@ -86,6 +88,22 @@ function Router() {
         <ProtectedRoute allowedRoles={["super_admin"]}>
           <DashboardLayout>
             <SuperAdminDashboard />
+          </DashboardLayout>
+        </ProtectedRoute>
+      </Route>
+
+      <Route path="/super-admin/tenants">
+        <ProtectedRoute allowedRoles={["super_admin"]}>
+          <DashboardLayout>
+            <SuperAdminTenants />
+          </DashboardLayout>
+        </ProtectedRoute>
+      </Route>
+
+      <Route path="/super-admin/plans">
+        <ProtectedRoute allowedRoles={["super_admin"]}>
+          <DashboardLayout>
+            <SuperAdminPlans />
           </DashboardLayout>
         </ProtectedRoute>
       </Route>

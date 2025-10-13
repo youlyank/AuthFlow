@@ -66,7 +66,9 @@ export interface IStorage {
   // Plan operations
   getPlan(id: string): Promise<Plan | undefined>;
   createPlan(plan: InsertPlan): Promise<Plan>;
-  listPlans(): Promise<Plan[]>;
+  updatePlan(id: string, data: Partial<Plan>): Promise<Plan | undefined>;
+  listPlans(includeInactive?: boolean): Promise<Plan[]>;
+  assignPlanToTenant(assignment: any): Promise<any>;
 
   // Session operations
   createSession(session: InsertSession): Promise<Session>;
@@ -172,8 +174,21 @@ export class DbStorage implements IStorage {
     return newPlan;
   }
 
-  async listPlans(): Promise<Plan[]> {
+  async updatePlan(id: string, data: Partial<Plan>): Promise<Plan | undefined> {
+    const [updatedPlan] = await db.update(plans).set(data).where(eq(plans.id, id)).returning();
+    return updatedPlan;
+  }
+
+  async listPlans(includeInactive = false): Promise<Plan[]> {
+    if (includeInactive) {
+      return db.select().from(plans);
+    }
     return db.select().from(plans).where(eq(plans.isActive, true));
+  }
+
+  async assignPlanToTenant(assignment: any): Promise<any> {
+    const [newAssignment] = await db.insert(tenantPlans).values(assignment).returning();
+    return newAssignment;
   }
 
   async createSession(session: InsertSession): Promise<Session> {

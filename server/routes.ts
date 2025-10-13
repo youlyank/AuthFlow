@@ -655,6 +655,163 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ===== Super Admin Tenant Management =====
+  
+  // Create tenant
+  app.post("/api/super-admin/tenants", requireAuth, requireRole(["super_admin"]), async (req: Request, res: Response) => {
+    try {
+      const { name, slug, domain } = req.body;
+      
+      if (!name || !slug) {
+        return res.status(400).json({ error: "Name and slug are required" });
+      }
+      
+      const tenant = await storage.createTenant({
+        name,
+        slug,
+        domain: domain || null,
+      });
+      
+      await auditLog(req, "tenant.created", "tenant", tenant.id, { name, slug });
+      
+      res.status(201).json(tenant);
+    } catch (error: any) {
+      console.error("Error creating tenant:", error);
+      res.status(400).json({ error: error.message || "Failed to create tenant" });
+    }
+  });
+
+  // Update tenant
+  app.patch("/api/super-admin/tenants/:id", requireAuth, requireRole(["super_admin"]), async (req: Request, res: Response) => {
+    try {
+      const { id } = req.params;
+      const updates = req.body;
+      
+      const tenant = await storage.updateTenant(id, updates);
+      
+      if (!tenant) {
+        return res.status(404).json({ error: "Tenant not found" });
+      }
+      
+      await auditLog(req, "tenant.updated", "tenant", id, updates);
+      
+      res.json(tenant);
+    } catch (error: any) {
+      console.error("Error updating tenant:", error);
+      res.status(400).json({ error: error.message || "Failed to update tenant" });
+    }
+  });
+
+  // Get all tenants (with pagination)
+  app.get("/api/super-admin/tenants", requireAuth, requireRole(["super_admin"]), async (req: Request, res: Response) => {
+    try {
+      const limit = req.query.limit ? parseInt(req.query.limit as string) : undefined;
+      const tenants = await storage.listTenants(limit);
+      
+      const tenantsWithDetails = await Promise.all(
+        tenants.map(async (tenant) => {
+          const users = await storage.listUsers(tenant.id);
+          return {
+            ...tenant,
+            userCount: users.length,
+            status: tenant.isActive ? "active" : "suspended",
+          };
+        })
+      );
+      
+      res.json(tenantsWithDetails);
+    } catch (error: any) {
+      console.error("Error fetching tenants:", error);
+      res.status(500).json({ error: "Failed to fetch tenants" });
+    }
+  });
+
+  // ===== Super Admin Plan Management =====
+  
+  // Create plan
+  app.post("/api/super-admin/plans", requireAuth, requireRole(["super_admin"]), async (req: Request, res: Response) => {
+    try {
+      const { name, price, currency, interval, features } = req.body;
+      
+      if (!name || price === undefined) {
+        return res.status(400).json({ error: "Name and price are required" });
+      }
+      
+      const plan = await storage.createPlan({
+        name,
+        price: parseInt(price),
+        currency: currency || "USD",
+        interval: interval || "monthly",
+        features: features || {},
+      });
+      
+      await auditLog(req, "plan.created", "plan", plan.id, { name, price });
+      
+      res.status(201).json(plan);
+    } catch (error: any) {
+      console.error("Error creating plan:", error);
+      res.status(400).json({ error: error.message || "Failed to create plan" });
+    }
+  });
+
+  // Get all plans
+  app.get("/api/super-admin/plans", requireAuth, requireRole(["super_admin"]), async (req: Request, res: Response) => {
+    try {
+      const showAll = req.query.all === "true";
+      const plans = await storage.listPlans(showAll);
+      res.json(plans);
+    } catch (error: any) {
+      console.error("Error fetching plans:", error);
+      res.status(500).json({ error: "Failed to fetch plans" });
+    }
+  });
+
+  // Update plan
+  app.patch("/api/super-admin/plans/:id", requireAuth, requireRole(["super_admin"]), async (req: Request, res: Response) => {
+    try {
+      const { id } = req.params;
+      const updates = req.body;
+      
+      const plan = await storage.updatePlan(id, updates);
+      
+      if (!plan) {
+        return res.status(404).json({ error: "Plan not found" });
+      }
+      
+      await auditLog(req, "plan.updated", "plan", id, updates);
+      
+      res.json(plan);
+    } catch (error: any) {
+      console.error("Error updating plan:", error);
+      res.status(400).json({ error: error.message || "Failed to update plan" });
+    }
+  });
+
+  // Assign plan to tenant
+  app.post("/api/super-admin/tenants/:tenantId/plan", requireAuth, requireRole(["super_admin"]), async (req: Request, res: Response) => {
+    try {
+      const { tenantId } = req.params;
+      const { planId, customPrice } = req.body;
+      
+      if (!planId) {
+        return res.status(400).json({ error: "Plan ID is required" });
+      }
+      
+      const assignment = await storage.assignPlanToTenant({
+        tenantId,
+        planId,
+        customPrice: customPrice || null,
+      });
+      
+      await auditLog(req, "tenant.plan_assigned", "tenant", tenantId, { planId, customPrice });
+      
+      res.status(201).json(assignment);
+    } catch (error: any) {
+      console.error("Error assigning plan:", error);
+      res.status(400).json({ error: error.message || "Failed to assign plan" });
+    }
+  });
+
   // ===== User Routes =====
 
   app.get("/api/user/stats", requireAuth, async (req: Request, res: Response) => {
