@@ -8,6 +8,7 @@ import {
   verifyPassword,
   generateToken,
   generateRefreshToken,
+  verifyToken,
   requireAuth,
   requireRole,
   auditLog,
@@ -54,23 +55,73 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   const httpServer = createServer(app);
 
-  // Setup Socket.IO for real-time notifications
+  // Setup Socket.IO for real-time notifications with authentication
   const io = new SocketIOServer(httpServer, {
     cors: {
-      origin: "*",
+      origin: process.env.REPLIT_DOMAINS?.split(',') || ["http://localhost:5000"],
       credentials: true,
     },
   });
 
-  io.on("connection", (socket) => {
-    console.log("Client connected:", socket.id);
+  // Socket.IO authentication middleware
+  io.use(async (socket, next) => {
+    try {
+      // Extract auth token from cookie header
+      const cookieHeader = socket.handshake.headers.cookie;
+      if (!cookieHeader) {
+        return next(new Error("Authentication required"));
+      }
 
+      // Parse cookies manually (since socket.io doesn't have req object)
+      const cookies: Record<string, string> = {};
+      cookieHeader.split(';').forEach(cookie => {
+        const [key, value] = cookie.trim().split('=');
+        if (key && value) {
+          cookies[key] = decodeURIComponent(value);
+        }
+      });
+
+      // Get the actual auth token (set by /api/auth/login and OAuth flows)
+      const token = cookies['token'];
+      if (!token) {
+        return next(new Error("No authentication token"));
+      }
+
+      // Verify JWT token and get user
+      const decoded = verifyToken(token);
+      if (!decoded || !decoded.userId) {
+        return next(new Error("Invalid token"));
+      }
+
+      const user = await storage.getUser(decoded.userId);
+      if (!user || !user.isActive) {
+        return next(new Error("User not found or inactive"));
+      }
+
+      // Attach authenticated user to socket for use in event handlers
+      socket.data.user = user;
+      next();
+    } catch (error) {
+      console.error("Socket.IO auth error:", error);
+      next(new Error("Authentication failed"));
+    }
+  });
+
+  io.on("connection", (socket) => {
+    const user = socket.data.user;
+    console.log(`Client connected: ${socket.id} (User: ${user.id}, Tenant: ${user.tenantId})`);
+
+    // Automatically join user's own notification room (authenticated)
+    socket.join(`user:${user.id}`);
+
+    // Reject any manual join requests - users can only receive their own notifications
     socket.on("join", (userId: string) => {
-      socket.join(`user:${userId}`);
+      console.warn(`Rejected join attempt for user ${userId} from ${user.id}`);
+      socket.emit("error", { message: "Cannot join other users' notification channels" });
     });
 
     socket.on("disconnect", () => {
-      console.log("Client disconnected:", socket.id);
+      console.log(`Client disconnected: ${socket.id} (User: ${user.id})`);
     });
   });
 
