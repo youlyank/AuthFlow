@@ -42,6 +42,20 @@ export interface IStorage {
   deleteUser(id: string): Promise<void>;
   listUsers(tenantId?: string, limit?: number): Promise<User[]>;
 
+  // OAuth operations
+  getOAuthAccount(provider: string, providerAccountId: string): Promise<any>;
+  createOAuthAccount(account: any): Promise<any>;
+
+  // Email verification operations
+  createEmailVerificationToken(token: any): Promise<any>;
+  getEmailVerificationToken(userId: string, token: string): Promise<any>;
+  deleteEmailVerificationToken(id: string): Promise<void>;
+
+  // Password reset operations
+  createPasswordResetToken(token: any): Promise<any>;
+  getPasswordResetToken(userId: string, token: string): Promise<any>;
+  deletePasswordResetToken(id: string): Promise<void>;
+
   // Tenant operations
   getTenant(id: string): Promise<Tenant | undefined>;
   getTenantBySlug(slug: string): Promise<Tenant | undefined>;
@@ -318,6 +332,71 @@ export class DbStorage implements IStorage {
       mfaEnabled: user?.mfaEnabled || false,
       lastLoginAt: user?.lastLoginAt,
     };
+  }
+
+  async getOAuthAccount(provider: string, providerAccountId: string): Promise<any> {
+    const [account] = await db
+      .select()
+      .from(oauthAccounts)
+      .where(
+        and(
+          eq(oauthAccounts.provider, provider),
+          eq(oauthAccounts.providerAccountId, providerAccountId)
+        )
+      )
+      .limit(1);
+    return account;
+  }
+
+  async createOAuthAccount(account: any): Promise<any> {
+    const [newAccount] = await db.insert(oauthAccounts).values(account).returning();
+    return newAccount;
+  }
+
+  async createEmailVerificationToken(token: any): Promise<any> {
+    const [newToken] = await db.insert(emailVerificationTokens).values(token).returning();
+    return newToken;
+  }
+
+  async getEmailVerificationToken(userId: string, token: string): Promise<any> {
+    const [verificationToken] = await db
+      .select()
+      .from(emailVerificationTokens)
+      .where(
+        and(
+          eq(emailVerificationTokens.userId, userId),
+          eq(emailVerificationTokens.token, token)
+        )
+      )
+      .limit(1);
+    return verificationToken;
+  }
+
+  async deleteEmailVerificationToken(id: string): Promise<void> {
+    await db.delete(emailVerificationTokens).where(eq(emailVerificationTokens.id, id));
+  }
+
+  async createPasswordResetToken(token: any): Promise<any> {
+    const [newToken] = await db.insert(passwordResetTokens).values(token).returning();
+    return newToken;
+  }
+
+  async getPasswordResetToken(userId: string, token: string): Promise<any> {
+    const [resetToken] = await db
+      .select()
+      .from(passwordResetTokens)
+      .where(
+        and(
+          eq(passwordResetTokens.userId, userId),
+          eq(passwordResetTokens.token, token)
+        )
+      )
+      .limit(1);
+    return resetToken;
+  }
+
+  async deletePasswordResetToken(id: string): Promise<void> {
+    await db.delete(passwordResetTokens).where(eq(passwordResetTokens.id, id));
   }
 }
 

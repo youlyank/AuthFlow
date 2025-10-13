@@ -12,7 +12,8 @@ import {
   requireRole,
   auditLog,
 } from "./auth";
-import { loginSchema, registerSchema, mfaVerifySchema, createNotificationSchema } from "@shared/schema";
+import { loginSchema, registerSchema, mfaVerifySchema, createNotificationSchema, passwordResetRequestSchema, passwordResetSchema } from "@shared/schema";
+import { emailService } from "./email";
 
 // Type augmentation for Express Request
 declare global {
@@ -53,6 +54,256 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // ===== Authentication Routes =====
 
+  // OAuth Routes
+  app.get("/api/auth/oauth/:provider", async (req: Request, res: Response) => {
+    const { provider } = req.params;
+    
+    // Generate CSRF state token
+    const state = generateRefreshToken(); // Cryptographically strong random token
+    const expiresAt = new Date();
+    expiresAt.setMinutes(expiresAt.getMinutes() + 10); // 10 minute expiration
+
+    // Store state in session/cookie or database
+    res.cookie("oauth_state", state, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      maxAge: 10 * 60 * 1000, // 10 minutes
+      sameSite: "lax",
+    });
+    
+    if (provider === "google") {
+      const googleAuthUrl = `https://accounts.google.com/o/oauth2/v2/auth?` +
+        `client_id=${process.env.GOOGLE_CLIENT_ID || "demo"}&` +
+        `redirect_uri=${encodeURIComponent(`${req.protocol}://${req.get("host")}/api/auth/oauth/google/callback`)}&` +
+        `response_type=code&` +
+        `scope=${encodeURIComponent("openid email profile")}&` +
+        `access_type=offline&` +
+        `state=${state}&` +
+        `prompt=consent`;
+      return res.redirect(googleAuthUrl);
+    }
+    
+    if (provider === "github") {
+      const githubAuthUrl = `https://github.com/login/oauth/authorize?` +
+        `client_id=${process.env.GITHUB_CLIENT_ID || "demo"}&` +
+        `redirect_uri=${encodeURIComponent(`${req.protocol}://${req.get("host")}/api/auth/oauth/github/callback`)}&` +
+        `scope=${encodeURIComponent("read:user user:email")}&` +
+        `state=${state}`;
+      return res.redirect(githubAuthUrl);
+    }
+    
+    res.status(400).json({ error: "Unsupported provider" });
+  });
+
+  // OAuth Callbacks
+  app.get("/api/auth/oauth/:provider/callback", async (req: Request, res: Response) => {
+    try {
+      const { provider } = req.params;
+      const { code, state, error } = req.query;
+
+      if (error) {
+        return res.redirect(`/auth/login?error=${error}`);
+      }
+
+      // Validate CSRF state
+      const storedState = req.cookies?.oauth_state;
+      if (!storedState || storedState !== state) {
+        console.error("OAuth CSRF validation failed:", { storedState, receivedState: state });
+        return res.redirect("/auth/login?error=csrf_validation_failed");
+      }
+
+      // Clear the state cookie after validation
+      res.clearCookie("oauth_state");
+
+      if (!code) {
+        return res.redirect("/auth/login?error=no_code");
+      }
+
+      let userInfo: any;
+      let oauthData: any;
+
+      if (provider === "google") {
+        // Exchange code for tokens
+        const tokenResponse = await fetch("https://oauth2.googleapis.com/token", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            code,
+            client_id: process.env.GOOGLE_CLIENT_ID,
+            client_secret: process.env.GOOGLE_CLIENT_SECRET,
+            redirect_uri: `${req.protocol}://${req.get("host")}/api/auth/oauth/google/callback`,
+            grant_type: "authorization_code",
+          }),
+        });
+
+        if (!tokenResponse.ok) {
+          return res.redirect("/auth/login?error=token_exchange_failed");
+        }
+
+        const tokens = await tokenResponse.json();
+
+        // Get user info
+        const userResponse = await fetch("https://www.googleapis.com/oauth2/v2/userinfo", {
+          headers: { Authorization: `Bearer ${tokens.access_token}` },
+        });
+
+        if (!userResponse.ok) {
+          return res.redirect("/auth/login?error=user_info_failed");
+        }
+
+        userInfo = await userResponse.json();
+        oauthData = {
+          provider: "google",
+          providerAccountId: userInfo.id,
+          accessToken: tokens.access_token,
+          refreshToken: tokens.refresh_token,
+          expiresAt: tokens.expires_in ? new Date(Date.now() + tokens.expires_in * 1000) : undefined,
+        };
+      } else if (provider === "github") {
+        // Exchange code for token
+        const tokenResponse = await fetch("https://github.com/login/oauth/access_token", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Accept: "application/json",
+          },
+          body: JSON.stringify({
+            code,
+            client_id: process.env.GITHUB_CLIENT_ID,
+            client_secret: process.env.GITHUB_CLIENT_SECRET,
+            redirect_uri: `${req.protocol}://${req.get("host")}/api/auth/oauth/github/callback`,
+          }),
+        });
+
+        if (!tokenResponse.ok) {
+          return res.redirect("/auth/login?error=token_exchange_failed");
+        }
+
+        const tokens = await tokenResponse.json();
+
+        // Get user info
+        const userResponse = await fetch("https://api.github.com/user", {
+          headers: { Authorization: `Bearer ${tokens.access_token}` },
+        });
+
+        if (!userResponse.ok) {
+          return res.redirect("/auth/login?error=user_info_failed");
+        }
+
+        userInfo = await userResponse.json();
+        oauthData = {
+          provider: "github",
+          providerAccountId: userInfo.id.toString(),
+          accessToken: tokens.access_token,
+          refreshToken: tokens.refresh_token,
+        };
+      } else {
+        return res.redirect("/auth/login?error=unsupported_provider");
+      }
+
+      // Check if OAuth account exists
+      const existingOAuth = await storage.getOAuthAccount(oauthData.provider, oauthData.providerAccountId);
+      
+      let user;
+      if (existingOAuth) {
+        // User exists, get user
+        user = await storage.getUser(existingOAuth.userId);
+      } else {
+        // Check if user with email exists
+        const email = userInfo.email || `${oauthData.provider}.${oauthData.providerAccountId}@authflow.local`;
+        const existingUser = await storage.getUserByEmail(email);
+        
+        if (existingUser) {
+          // Link OAuth to existing user
+          user = existingUser;
+          await storage.createOAuthAccount({
+            userId: user.id,
+            ...oauthData,
+          });
+        } else {
+          // Create new user
+          const names = (userInfo.name || "").split(" ");
+          user = await storage.createUser({
+            email,
+            firstName: userInfo.given_name || names[0] || "User",
+            lastName: userInfo.family_name || names.slice(1).join(" ") || "",
+            avatarUrl: userInfo.picture || userInfo.avatar_url,
+            emailVerified: true, // OAuth emails are verified
+            role: "user",
+          });
+
+          // Create OAuth account
+          await storage.createOAuthAccount({
+            userId: user.id,
+            ...oauthData,
+          });
+
+          await auditLog(req, "user.created", "user", user.id, { email: user.email, provider: oauthData.provider });
+        }
+      }
+
+      if (!user || !user.isActive) {
+        return res.redirect("/auth/login?error=account_inactive");
+      }
+
+      // Generate tokens
+      const token = generateToken({
+        userId: user.id,
+        email: user.email,
+        role: user.role,
+        tenantId: user.tenantId || undefined,
+      });
+      const refreshToken = generateRefreshToken();
+
+      // Create session
+      const expiresAt = new Date();
+      expiresAt.setDate(expiresAt.getDate() + 30);
+
+      await storage.createSession({
+        userId: user.id,
+        token,
+        refreshToken,
+        ipAddress: req.ip,
+        userAgent: req.headers["user-agent"],
+        expiresAt,
+      });
+
+      // Update last login
+      await storage.updateUser(user.id, {
+        lastLoginAt: new Date(),
+        lastLoginIp: req.ip,
+      });
+
+      // Create login history
+      await storage.createLoginHistory({
+        userId: user.id,
+        email: user.email,
+        success: true,
+        ipAddress: req.ip,
+        userAgent: req.headers["user-agent"],
+      });
+
+      res.cookie("token", token, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === "production",
+        maxAge: 30 * 24 * 60 * 60 * 1000,
+      });
+
+      // Redirect based on role
+      const redirectMap = {
+        super_admin: "/super-admin",
+        tenant_admin: "/admin",
+        user: "/dashboard",
+      };
+      const redirectTo = redirectMap[user.role as keyof typeof redirectMap] || "/dashboard";
+      
+      res.redirect(redirectTo);
+    } catch (error: any) {
+      console.error("OAuth callback error:", error);
+      res.redirect("/auth/login?error=oauth_failed");
+    }
+  });
+
   // Register
   app.post("/api/auth/register", async (req: Request, res: Response) => {
     try {
@@ -75,10 +326,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
         tenantId: null, // Will be set based on tenant slug if provided
       });
 
+      // Generate verification code
+      const verificationCode = emailService.generateOTP(6);
+      const expiresAt = new Date();
+      expiresAt.setMinutes(expiresAt.getMinutes() + 15);
+
+      await storage.createEmailVerificationToken({
+        userId: user.id,
+        token: verificationCode,
+        expiresAt,
+      });
+
+      // Send verification email
+      await emailService.sendVerificationEmail(user.email, verificationCode);
+
       // Create audit log
       await auditLog(req, "user.created", "user", user.id, { email: user.email });
 
-      res.status(201).json({ message: "Registration successful", userId: user.id });
+      res.status(201).json({ message: "Registration successful. Please check your email for verification code.", userId: user.id });
     } catch (error: any) {
       console.error("Registration error:", error);
       res.status(400).json({ error: error.message || "Registration failed" });
@@ -259,6 +524,134 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error: any) {
       console.error("Error fetching recent users:", error);
       res.status(500).json({ error: "Failed to fetch users" });
+    }
+  });
+
+  // Password Reset Request
+  app.post("/api/auth/forgot-password", async (req: Request, res: Response) => {
+    try {
+      const data = passwordResetRequestSchema.parse(req.body);
+
+      const user = await storage.getUserByEmail(data.email);
+      
+      // Don't reveal if user exists or not (security)
+      if (user) {
+        // Generate reset code
+        const resetCode = emailService.generateOTP(6);
+        const expiresAt = new Date();
+        expiresAt.setMinutes(expiresAt.getMinutes() + 15);
+
+        await storage.createPasswordResetToken({
+          userId: user.id,
+          token: resetCode,
+          expiresAt,
+        });
+
+        // Send reset email
+        await emailService.sendPasswordResetEmail(user.email, resetCode);
+
+        await auditLog(req, "password_reset.requested", "user", user.id);
+      }
+
+      res.json({ message: "If an account exists with this email, a reset code has been sent." });
+    } catch (error: any) {
+      console.error("Password reset request error:", error);
+      res.status(400).json({ error: error.message || "Request failed" });
+    }
+  });
+
+  // Password Reset with Code
+  app.post("/api/auth/reset-password", async (req: Request, res: Response) => {
+    try {
+      const { email, code, newPassword } = req.body;
+
+      const user = await storage.getUserByEmail(email);
+      if (!user) {
+        return res.status(400).json({ error: "Invalid request" });
+      }
+
+      const resetToken = await storage.getPasswordResetToken(user.id, code);
+      if (!resetToken || resetToken.expiresAt < new Date()) {
+        return res.status(400).json({ error: "Invalid or expired code" });
+      }
+
+      // Update password
+      const passwordHash = await hashPassword(newPassword);
+      await storage.updateUser(user.id, { passwordHash });
+
+      // Delete used token
+      await storage.deletePasswordResetToken(resetToken.id);
+
+      await auditLog(req, "password.reset", "user", user.id);
+
+      res.json({ message: "Password reset successful" });
+    } catch (error: any) {
+      console.error("Password reset error:", error);
+      res.status(400).json({ error: error.message || "Reset failed" });
+    }
+  });
+
+  // Email Verification
+  app.post("/api/auth/verify-email", async (req: Request, res: Response) => {
+    try {
+      const { email, code } = req.body;
+
+      const user = await storage.getUserByEmail(email);
+      if (!user) {
+        return res.status(400).json({ error: "Invalid request" });
+      }
+
+      const verificationToken = await storage.getEmailVerificationToken(user.id, code);
+      if (!verificationToken || verificationToken.expiresAt < new Date()) {
+        return res.status(400).json({ error: "Invalid or expired code" });
+      }
+
+      // Mark email as verified
+      await storage.updateUser(user.id, { emailVerified: true });
+
+      // Delete used token
+      await storage.deleteEmailVerificationToken(verificationToken.id);
+
+      await auditLog(req, "email.verified", "user", user.id);
+
+      res.json({ message: "Email verified successfully" });
+    } catch (error: any) {
+      console.error("Email verification error:", error);
+      res.status(400).json({ error: error.message || "Verification failed" });
+    }
+  });
+
+  // Resend Verification Code
+  app.post("/api/auth/resend-verification", async (req: Request, res: Response) => {
+    try {
+      const { email } = req.body;
+
+      const user = await storage.getUserByEmail(email);
+      if (!user) {
+        return res.status(400).json({ error: "User not found" });
+      }
+
+      if (user.emailVerified) {
+        return res.status(400).json({ error: "Email already verified" });
+      }
+
+      // Generate new code
+      const verificationCode = emailService.generateOTP(6);
+      const expiresAt = new Date();
+      expiresAt.setMinutes(expiresAt.getMinutes() + 15);
+
+      await storage.createEmailVerificationToken({
+        userId: user.id,
+        token: verificationCode,
+        expiresAt,
+      });
+
+      await emailService.sendVerificationEmail(user.email, verificationCode);
+
+      res.json({ message: "Verification code sent" });
+    } catch (error: any) {
+      console.error("Resend verification error:", error);
+      res.status(400).json({ error: error.message || "Request failed" });
     }
   });
 
