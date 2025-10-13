@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { loginSchema, type LoginInput } from "@shared/schema";
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import {
@@ -26,6 +26,7 @@ export default function LoginPage() {
   const [, setLocation] = useLocation();
   const [showPassword, setShowPassword] = useState(false);
   const { toast } = useToast();
+  const queryClient = useQueryClient();
 
   const form = useForm<LoginInput>({
     resolver: zodResolver(loginSchema),
@@ -37,9 +38,15 @@ export default function LoginPage() {
 
   const loginMutation = useMutation({
     mutationFn: async (data: LoginInput) => {
-      return apiRequest("POST", "/api/auth/login", data);
+      return apiRequest("POST", "/api/auth/login", data) as Promise<any>;
     },
-    onSuccess: (data) => {
+    onSuccess: async (data: any) => {
+      // Update the auth context immediately
+      queryClient.setQueryData(["/api/auth/me"], { user: data.user });
+      
+      // Small delay to ensure state is fully updated
+      await new Promise(resolve => setTimeout(resolve, 100));
+      
       if (data.requiresMfa) {
         setLocation("/auth/mfa");
       } else {
