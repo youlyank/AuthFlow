@@ -39,6 +39,9 @@ export interface IStorage {
   getUserByEmail(email: string, tenantId?: string): Promise<User | undefined>;
   createUser(user: InsertUser): Promise<User>;
   updateUser(id: string, data: Partial<User>): Promise<User | undefined>;
+  listUsersByTenant(tenantId: string, limit?: number): Promise<User[]>;
+  updateUserRole(userId: string, role: string): Promise<User | undefined>;
+  deactivateUser(userId: string): Promise<User | undefined>;
   deleteUser(id: string): Promise<void>;
   listUsers(tenantId?: string, limit?: number): Promise<User[]>;
 
@@ -55,6 +58,11 @@ export interface IStorage {
   createPasswordResetToken(token: any): Promise<any>;
   getPasswordResetToken(userId: string, token: string): Promise<any>;
   deletePasswordResetToken(id: string): Promise<void>;
+
+  // MFA operations
+  createMfaSecret(secret: any): Promise<any>;
+  getMfaSecret(userId: string): Promise<any>;
+  deleteMfaSecret(userId: string): Promise<void>;
 
   // Tenant operations
   getTenant(id: string): Promise<Tenant | undefined>;
@@ -73,9 +81,11 @@ export interface IStorage {
   // Session operations
   createSession(session: InsertSession): Promise<Session>;
   getSessionByToken(token: string): Promise<Session | undefined>;
+  getSession(id: string): Promise<Session | undefined>;
   updateSession(id: string, data: Partial<Session>): Promise<void>;
   deleteSession(id: string): Promise<void>;
   getUserSessions(userId: string): Promise<Session[]>;
+  getTenantSessions(tenantId: string): Promise<any[]>;
 
   // Notification operations
   createNotification(notification: InsertNotification): Promise<Notification>;
@@ -134,6 +144,20 @@ export class DbStorage implements IStorage {
       ? db.select().from(users).where(eq(users.tenantId, tenantId)).limit(limit)
       : db.select().from(users).limit(limit);
     return query;
+  }
+
+  async listUsersByTenant(tenantId: string, limit = 100): Promise<User[]> {
+    return db.select().from(users).where(eq(users.tenantId, tenantId)).limit(limit).orderBy(desc(users.createdAt));
+  }
+
+  async updateUserRole(userId: string, role: string): Promise<User | undefined> {
+    const [updatedUser] = await db.update(users).set({ role: role as any }).where(eq(users.id, userId)).returning();
+    return updatedUser;
+  }
+
+  async deactivateUser(userId: string): Promise<User | undefined> {
+    const [updatedUser] = await db.update(users).set({ isActive: false }).where(eq(users.id, userId)).returning();
+    return updatedUser;
   }
 
   async getTenant(id: string): Promise<Tenant | undefined> {
@@ -217,6 +241,36 @@ export class DbStorage implements IStorage {
       .orderBy(desc(sessions.createdAt));
   }
 
+  async getSession(id: string): Promise<Session | undefined> {
+    const [session] = await db.select().from(sessions).where(eq(sessions.id, id)).limit(1);
+    return session;
+  }
+
+  async getTenantSessions(tenantId: string): Promise<any[]> {
+    const tenantSessions = await db
+      .select({
+        id: sessions.id,
+        userId: sessions.userId,
+        token: sessions.token,
+        isActive: sessions.isActive,
+        expiresAt: sessions.expiresAt,
+        userAgent: sessions.userAgent,
+        ipAddress: sessions.ipAddress,
+        deviceInfo: sessions.deviceInfo,
+        lastActivityAt: sessions.lastActivityAt,
+        createdAt: sessions.createdAt,
+        userEmail: users.email,
+        userFirstName: users.firstName,
+        userLastName: users.lastName,
+      })
+      .from(sessions)
+      .innerJoin(users, eq(sessions.userId, users.id))
+      .where(and(eq(users.tenantId, tenantId), eq(sessions.isActive, true)))
+      .orderBy(desc(sessions.lastActivityAt));
+    
+    return tenantSessions;
+  }
+
   async createNotification(notification: InsertNotification): Promise<Notification> {
     const [newNotification] = await db.insert(notifications).values(notification).returning();
     return newNotification;
@@ -292,13 +346,29 @@ export class DbStorage implements IStorage {
       .from(tenants)
       .where(eq(tenants.isActive, true));
     const [userCount] = await db.select({ count: count() }).from(users);
+    
+    // Calculate MAU (Monthly Active Users) - users who logged in last 30 days
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+    
+    const [mauCount] = await db
+      .select({ count: count() })
+      .from(users)
+      .where(sql`${users.lastLoginAt} >= ${thirtyDaysAgo}`);
+    
+    // Get recent login count for trend
+    const [recentLogins] = await db
+      .select({ count: count() })
+      .from(loginHistory)
+      .where(sql`${loginHistory.createdAt} >= ${thirtyDaysAgo}`);
 
     return {
       totalTenants: tenantCount.count,
       activeTenants: activeTenantsCount.count,
       totalUsers: userCount.count,
+      monthlyActiveUsers: mauCount.count,
+      recentLogins: recentLogins.count,
       totalRevenue: 0,
-      monthlyActiveUsers: 0,
       revenueGrowth: 0,
     };
   }
@@ -320,11 +390,29 @@ export class DbStorage implements IStorage {
       .innerJoin(users, eq(sessions.userId, users.id))
       .where(and(eq(users.tenantId, tenantId), eq(sessions.isActive, true)));
 
+    // MFA adoption rate
+    const [mfaEnabledCount] = await db
+      .select({ count: count() })
+      .from(users)
+      .where(and(eq(users.tenantId, tenantId), eq(users.mfaEnabled, true)));
+
+    // Recent logins (last 7 days)
+    const sevenDaysAgo = new Date();
+    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+    
+    const [recentLoginCount] = await db
+      .select({ count: count() })
+      .from(loginHistory)
+      .innerJoin(users, eq(loginHistory.userId, users.id))
+      .where(and(eq(users.tenantId, tenantId), sql`${loginHistory.createdAt} >= ${sevenDaysAgo}`));
+
     return {
       totalUsers: userCount.count,
       activeUsers: activeUserCount.count,
       totalRoles: 3,
       activeSessions: sessionCount.count,
+      mfaAdoption: userCount.count > 0 ? Math.round((Number(mfaEnabledCount.count) / Number(userCount.count)) * 100) : 0,
+      recentLogins: recentLoginCount.count,
     };
   }
 
@@ -339,13 +427,28 @@ export class DbStorage implements IStorage {
       .from(sessions)
       .where(and(eq(sessions.userId, userId), eq(sessions.isActive, true)));
 
+    const [loginCount] = await db
+      .select({ count: count() })
+      .from(loginHistory)
+      .where(eq(loginHistory.userId, userId));
+
+    // Get recent login history for trend
+    const recentLogins = await db
+      .select()
+      .from(loginHistory)
+      .where(eq(loginHistory.userId, userId))
+      .orderBy(desc(loginHistory.createdAt))
+      .limit(5);
+
     const user = await this.getUser(userId);
 
     return {
       totalSessions: totalSessions.count,
       activeSessions: activeSessions.count,
+      totalLogins: loginCount.count,
       mfaEnabled: user?.mfaEnabled || false,
       lastLoginAt: user?.lastLoginAt,
+      recentLogins,
     };
   }
 
@@ -412,6 +515,20 @@ export class DbStorage implements IStorage {
 
   async deletePasswordResetToken(id: string): Promise<void> {
     await db.delete(passwordResetTokens).where(eq(passwordResetTokens.id, id));
+  }
+
+  async createMfaSecret(secret: any): Promise<any> {
+    const [newSecret] = await db.insert(mfaSecrets).values(secret).returning();
+    return newSecret;
+  }
+
+  async getMfaSecret(userId: string): Promise<any> {
+    const [secret] = await db.select().from(mfaSecrets).where(eq(mfaSecrets.userId, userId)).limit(1);
+    return secret;
+  }
+
+  async deleteMfaSecret(userId: string): Promise<void> {
+    await db.delete(mfaSecrets).where(eq(mfaSecrets.userId, userId));
   }
 }
 

@@ -14,6 +14,8 @@ import {
 } from "./auth";
 import { loginSchema, registerSchema, mfaVerifySchema, createNotificationSchema, passwordResetRequestSchema, passwordResetSchema } from "@shared/schema";
 import { emailService } from "./email";
+import speakeasy from "speakeasy";
+import QRCode from "qrcode";
 
 // Type augmentation for Express Request
 declare global {
@@ -520,7 +522,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/admin/users/recent", requireAuth, requireRole(["tenant_admin"]), async (req: Request, res: Response) => {
     try {
       const users = await storage.listUsers(req.user.tenantId, 10);
-      res.json(users);
+      // Sanitize sensitive fields
+      const sanitizedUsers = users.map(user => ({
+        ...user,
+        passwordHash: undefined,
+      }));
+      res.json(sanitizedUsers);
     } catch (error: any) {
       console.error("Error fetching recent users:", error);
       res.status(500).json({ error: "Failed to fetch users" });
@@ -809,6 +816,306 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error: any) {
       console.error("Error assigning plan:", error);
       res.status(400).json({ error: error.message || "Failed to assign plan" });
+    }
+  });
+
+  // ===== Tenant Admin Routes =====
+
+  // List all users in tenant
+  app.get("/api/tenant-admin/users", requireAuth, requireRole(["tenant_admin"]), async (req: Request, res: Response) => {
+    try {
+      if (!req.user.tenantId) {
+        return res.status(403).json({ error: "Tenant ID required" });
+      }
+      
+      const users = await storage.listUsersByTenant(req.user.tenantId);
+      // Sanitize sensitive fields
+      const sanitizedUsers = users.map(user => ({
+        ...user,
+        passwordHash: undefined,
+      }));
+      res.json(sanitizedUsers);
+    } catch (error: any) {
+      console.error("Error fetching users:", error);
+      res.status(500).json({ error: "Failed to fetch users" });
+    }
+  });
+
+  // Invite/create user in tenant
+  app.post("/api/tenant-admin/users/invite", requireAuth, requireRole(["tenant_admin"]), async (req: Request, res: Response) => {
+    try {
+      if (!req.user.tenantId) {
+        return res.status(403).json({ error: "Tenant ID required" });
+      }
+
+      const { email, role, firstName, lastName } = req.body;
+
+      if (!email) {
+        return res.status(400).json({ error: "Email is required" });
+      }
+
+      // Check if user already exists in this tenant
+      const existingUser = await storage.getUserByEmail(email, req.user.tenantId);
+      if (existingUser) {
+        return res.status(400).json({ error: "User already exists in this tenant" });
+      }
+
+      // Generate secure temporary password
+      const tempPassword = randomBytes(16).toString("base64").slice(0, 12) + "!A1";
+      const hashedPassword = await hashPassword(tempPassword);
+
+      const newUser = await storage.createUser({
+        tenantId: req.user.tenantId,
+        email,
+        passwordHash: hashedPassword,
+        firstName: firstName || "",
+        lastName: lastName || "",
+        role: role || "user",
+        isActive: true,
+        emailVerified: false,
+      });
+
+      // Send invitation email
+      await emailService.sendInvitationEmail(
+        email,
+        firstName || email,
+        `${process.env.REPLIT_DOMAINS?.split(',')[0] || 'http://localhost:5000'}/login`,
+        email,
+        tempPassword
+      );
+
+      await auditLog(req, "user.invited", "user", newUser.id, { email, role });
+
+      res.status(201).json({ ...newUser, passwordHash: undefined });
+    } catch (error: any) {
+      console.error("Error inviting user:", error);
+      res.status(400).json({ error: error.message || "Failed to invite user" });
+    }
+  });
+
+  // Update user role
+  app.patch("/api/tenant-admin/users/:userId/role", requireAuth, requireRole(["tenant_admin"]), async (req: Request, res: Response) => {
+    try {
+      const { userId } = req.params;
+      const { role } = req.body;
+
+      if (!role || !["user", "tenant_admin"].includes(role)) {
+        return res.status(400).json({ error: "Valid role required (user or tenant_admin)" });
+      }
+
+      // Verify user belongs to same tenant
+      const user = await storage.getUser(userId);
+      if (!user || user.tenantId !== req.user.tenantId) {
+        return res.status(404).json({ error: "User not found" });
+      }
+
+      const updatedUser = await storage.updateUserRole(userId, role);
+      
+      await auditLog(req, "user.role_updated", "user", userId, { role });
+      
+      // Sanitize sensitive fields
+      res.json({ 
+        id: updatedUser?.id,
+        email: updatedUser?.email,
+        firstName: updatedUser?.firstName,
+        lastName: updatedUser?.lastName,
+        role: updatedUser?.role,
+        isActive: updatedUser?.isActive,
+        emailVerified: updatedUser?.emailVerified,
+        mfaEnabled: updatedUser?.mfaEnabled,
+      });
+    } catch (error: any) {
+      console.error("Error updating user role:", error);
+      res.status(400).json({ error: error.message || "Failed to update user role" });
+    }
+  });
+
+  // Deactivate/remove user
+  app.delete("/api/tenant-admin/users/:userId", requireAuth, requireRole(["tenant_admin"]), async (req: Request, res: Response) => {
+    try {
+      const { userId } = req.params;
+
+      // Verify user belongs to same tenant
+      const user = await storage.getUser(userId);
+      if (!user || user.tenantId !== req.user.tenantId) {
+        return res.status(404).json({ error: "User not found" });
+      }
+
+      // Cannot deactivate yourself
+      if (userId === req.user.id) {
+        return res.status(400).json({ error: "Cannot deactivate your own account" });
+      }
+
+      await storage.deactivateUser(userId);
+      
+      await auditLog(req, "user.deactivated", "user", userId, {});
+      
+      res.json({ message: "User deactivated successfully" });
+    } catch (error: any) {
+      console.error("Error deactivating user:", error);
+      res.status(400).json({ error: error.message || "Failed to deactivate user" });
+    }
+  });
+
+  // List all sessions in tenant
+  app.get("/api/tenant-admin/sessions", requireAuth, requireRole(["tenant_admin"]), async (req: Request, res: Response) => {
+    try {
+      if (!req.user.tenantId) {
+        return res.status(403).json({ error: "Tenant ID required" });
+      }
+      
+      const sessions = await storage.getTenantSessions(req.user.tenantId);
+      res.json(sessions);
+    } catch (error: any) {
+      console.error("Error fetching sessions:", error);
+      res.status(500).json({ error: "Failed to fetch sessions" });
+    }
+  });
+
+  // Revoke a session
+  app.delete("/api/tenant-admin/sessions/:sessionId", requireAuth, requireRole(["tenant_admin"]), async (req: Request, res: Response) => {
+    try {
+      const { sessionId } = req.params;
+      
+      // Verify session belongs to same tenant
+      const session = await storage.getSession(sessionId);
+      if (!session) {
+        return res.status(404).json({ error: "Session not found" });
+      }
+      
+      const user = await storage.getUser(session.userId);
+      if (!user || user.tenantId !== req.user.tenantId) {
+        return res.status(403).json({ error: "Unauthorized" });
+      }
+
+      await storage.deleteSession(sessionId);
+      
+      await auditLog(req, "session.revoked", "session", sessionId, { userId: session.userId });
+      
+      res.json({ message: "Session revoked successfully" });
+    } catch (error: any) {
+      console.error("Error revoking session:", error);
+      res.status(400).json({ error: error.message || "Failed to revoke session" });
+    }
+  });
+
+  // ===== MFA/TOTP Routes =====
+
+  // Generate TOTP secret and QR code
+  app.post("/api/user/mfa/totp/setup", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const secret = speakeasy.generateSecret({
+        name: `Authflow (${req.user.email})`,
+        issuer: "Authflow",
+      });
+
+      // Generate QR code
+      const qrCodeUrl = await QRCode.toDataURL(secret.otpauth_url!);
+
+      // Generate backup codes
+      const backupCodes = Array.from({ length: 10 }, () => 
+        Math.random().toString(36).substring(2, 10).toUpperCase()
+      );
+
+      // Store secret temporarily (will be confirmed on verify)
+      req.session.tempMfaSecret = {
+        secret: secret.base32,
+        backupCodes,
+      };
+
+      res.json({
+        secret: secret.base32,
+        qrCode: qrCodeUrl,
+        backupCodes,
+      });
+    } catch (error: any) {
+      console.error("Error setting up TOTP:", error);
+      res.status(500).json({ error: "Failed to setup TOTP" });
+    }
+  });
+
+  // Verify and enable TOTP
+  app.post("/api/user/mfa/totp/verify", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const { token } = req.body;
+
+      if (!req.session.tempMfaSecret) {
+        return res.status(400).json({ error: "No MFA setup in progress" });
+      }
+
+      const verified = speakeasy.totp.verify({
+        secret: req.session.tempMfaSecret.secret,
+        encoding: "base32",
+        token,
+        window: 2,
+      });
+
+      if (!verified) {
+        return res.status(400).json({ error: "Invalid verification code" });
+      }
+
+      // Save MFA secret to database
+      await storage.createMfaSecret({
+        userId: req.user.id,
+        secret: req.session.tempMfaSecret.secret,
+        backupCodes: req.session.tempMfaSecret.backupCodes,
+      });
+
+      // Enable MFA on user account
+      await storage.updateUser(req.user.id, {
+        mfaEnabled: true,
+        mfaMethod: "totp",
+      });
+
+      // Clear temp secret
+      delete req.session.tempMfaSecret;
+
+      await auditLog(req, "mfa.enabled", "user", req.user.id, { method: "totp" });
+
+      res.json({ 
+        message: "TOTP enabled successfully",
+        backupCodes: req.session.tempMfaSecret?.backupCodes 
+      });
+    } catch (error: any) {
+      console.error("Error verifying TOTP:", error);
+      res.status(500).json({ error: "Failed to verify TOTP" });
+    }
+  });
+
+  // Disable TOTP
+  app.post("/api/user/mfa/totp/disable", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const { password } = req.body;
+
+      if (!password) {
+        return res.status(400).json({ error: "Password required" });
+      }
+
+      // Verify password
+      const user = await storage.getUser(req.user.id);
+      if (!user || !user.passwordHash) {
+        return res.status(400).json({ error: "Invalid request" });
+      }
+
+      const validPassword = await verifyPassword(password, user.passwordHash);
+      if (!validPassword) {
+        return res.status(401).json({ error: "Invalid password" });
+      }
+
+      // Disable MFA
+      await storage.updateUser(req.user.id, {
+        mfaEnabled: false,
+        mfaMethod: null,
+      });
+
+      await storage.deleteMfaSecret(req.user.id);
+
+      await auditLog(req, "mfa.disabled", "user", req.user.id, {});
+
+      res.json({ message: "TOTP disabled successfully" });
+    } catch (error: any) {
+      console.error("Error disabling TOTP:", error);
+      res.status(500).json({ error: "Failed to disable TOTP" });
     }
   });
 
