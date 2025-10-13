@@ -3,11 +3,7 @@ import { QueryClient, QueryFunction } from "@tanstack/react-query";
 async function throwIfResNotOk(res: Response) {
   if (!res.ok) {
     const text = (await res.text()) || res.statusText;
-    // Don't clear auth on non-401 errors
-    if (res.status === 401) {
-      // Only clear token if auth actually failed, not on network errors
-      localStorage.removeItem("auth_token");
-    }
+    // Don't automatically clear token on 401 - let the error handler decide
     throw new Error(`${res.status}: ${text}`);
   }
 }
@@ -69,6 +65,13 @@ export const queryClient = new QueryClient({
       refetchOnWindowFocus: false,
       staleTime: Infinity,
       retry: false,
+      onError: (error: any) => {
+        // Only clear auth on actual authentication failures, not permission errors
+        if (error.message?.includes("401")) {
+          console.error("Authentication error:", error);
+          // Let the auth context handle logout
+        }
+      },
     },
     mutations: {
       retry: false,

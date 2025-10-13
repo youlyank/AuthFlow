@@ -16,7 +16,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const queryClient = useQueryClient();
 
-  const { data: authData, isLoading } = useQuery<{ user: User | null }>({
+  const { data: authData, isLoading, error } = useQuery<{ user: User | null }>({
     queryKey: ["/api/auth/me"],
     retry: false,
     refetchOnWindowFocus: false,
@@ -25,8 +25,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (authData?.user) {
       setUser(authData.user);
+    } else if (error) {
+      // Only clear if we have a real auth error
+      setUser(null);
+      localStorage.removeItem("auth_token");
     }
-  }, [authData]);
+  }, [authData, error]);
 
   const loginMutation = useMutation({
     mutationFn: async ({ email, password }: { email: string; password: string }) => {
