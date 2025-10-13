@@ -40,8 +40,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       return res.json();
     },
     onSuccess: (data) => {
+      // Set user immediately and update cache without refetching
       setUser(data.user);
-      queryClient.invalidateQueries({ queryKey: ["/api/auth/me"] });
+      queryClient.setQueryData(["/api/auth/me"], { user: data.user });
     },
   });
 
