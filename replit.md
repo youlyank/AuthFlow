@@ -1,7 +1,15 @@
 # Authflow - Enterprise Authentication Platform
 
 ## Overview
-Authflow is an enterprise-grade, multi-tenant authentication SaaS platform designed to be a superior alternative to Auth0, Okta, and Keycloak. The platform features flexible subscription management, comprehensive security features, and real-time notifications.
+Authflow is a **licensable authentication product** that companies integrate into their applications - a superior alternative to Auth0, Okta, and Keycloak. We provide authentication-as-a-product that businesses purchase and deploy either on our cloud infrastructure or self-hosted in their own environment.
+
+## Business Model
+**Product Type:** B2B Authentication Platform (License-based)
+- 🏢 Companies purchase licenses to integrate Authflow into their applications
+- 🔌 Easy integration via SDKs (JavaScript, Python, Go, PHP) and REST APIs
+- 📦 Flexible deployment: Cloud-hosted (our infrastructure) OR self-hosted (customer infrastructure)
+- 💰 Revenue: License fees based on MAU (Monthly Active Users), feature tiers, or enterprise contracts
+- 🎨 Complete white-label capabilities with custom branding per customer
 
 ## Current State (October 13, 2025)
 ✅ **Completed Implementation:**
