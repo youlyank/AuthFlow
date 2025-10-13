@@ -59,31 +59,6 @@ const superAdminItems = [
     url: "/super-admin/plans",
     icon: CreditCard,
   },
-  {
-    title: "Users",
-    url: "/super-admin/users",
-    icon: Users,
-  },
-  {
-    title: "Analytics",
-    url: "/super-admin/analytics",
-    icon: BarChart3,
-  },
-  {
-    title: "Notifications",
-    url: "/super-admin/notifications",
-    icon: Bell,
-  },
-  {
-    title: "API Keys",
-    url: "/super-admin/api-keys",
-    icon: Key,
-  },
-  {
-    title: "Audit Logs",
-    url: "/super-admin/audit-logs",
-    icon: History,
-  },
 ];
 
 const tenantAdminItems = [

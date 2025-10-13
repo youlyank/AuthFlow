@@ -45,6 +45,12 @@ function ProtectedRoute({ children, allowedRoles }: { children: React.ReactNode;
   }
 
   if (allowedRoles && !allowedRoles.includes(user.role)) {
+    // Redirect based on actual role
+    if (user.role === "super_admin") {
+      return <Redirect to="/super-admin" />;
+    } else if (user.role === "tenant_admin") {
+      return <Redirect to="/admin" />;
+    }
     return <Redirect to="/dashboard" />;
   }
 
