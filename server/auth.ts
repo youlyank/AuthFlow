@@ -1,6 +1,6 @@
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
-import { randomBytes } from "crypto";
+import { randomBytes, createHash } from "crypto";
 import type { Request, Response, NextFunction } from "express";
 import { storage } from "./storage";
 
@@ -39,6 +39,27 @@ export function generateRefreshToken(): string {
 
 export function verifyToken(token: string): JwtPayload {
   return jwt.verify(token, JWT_SECRET) as JwtPayload;
+}
+
+// OAuth2 Token Generation and Hashing
+export function generateOAuth2Secret(): string {
+  return randomBytes(32).toString("hex"); // 64 character hex string
+}
+
+export function generateOAuth2Code(): string {
+  return randomBytes(32).toString("base64url"); // URL-safe base64
+}
+
+export function generateOAuth2Token(): string {
+  return randomBytes(48).toString("base64url"); // Longer for access/refresh tokens
+}
+
+export function hashOAuth2Secret(secret: string): string {
+  return createHash("sha256").update(secret).digest("hex");
+}
+
+export function verifyOAuth2Secret(secret: string, hash: string): boolean {
+  return hashOAuth2Secret(secret) === hash;
 }
 
 export async function requireAuth(req: Request, res: Response, next: NextFunction) {

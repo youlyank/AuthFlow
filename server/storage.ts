@@ -124,23 +124,26 @@ export interface IStorage {
 
   // OAuth2 Provider operations
   createOAuth2Client(client: any): Promise<any>;
-  getOAuth2Client(clientId: string): Promise<any>;
-  getOAuth2ClientById(id: string): Promise<any>;
+  getOAuth2Client(clientId: string, tenantId?: string): Promise<any>;
+  getOAuth2ClientById(id: string, tenantId?: string): Promise<any>;
   listOAuth2Clients(tenantId: string): Promise<any[]>;
-  updateOAuth2Client(id: string, data: any): Promise<any>;
-  deleteOAuth2Client(id: string): Promise<void>;
+  updateOAuth2Client(id: string, tenantId: string, data: any): Promise<any>;
+  deleteOAuth2Client(id: string, tenantId: string): Promise<void>;
   
   createOAuth2AuthorizationCode(code: any): Promise<any>;
-  getOAuth2AuthorizationCode(code: string): Promise<any>;
+  getOAuth2AuthorizationCodeByHash(codeHash: string): Promise<any>;
   deleteOAuth2AuthorizationCode(id: string): Promise<void>;
+  cleanupExpiredAuthorizationCodes(): Promise<void>;
   
   createOAuth2AccessToken(token: any): Promise<any>;
-  getOAuth2AccessToken(token: string): Promise<any>;
+  getOAuth2AccessTokenByHash(tokenHash: string): Promise<any>;
   deleteOAuth2AccessToken(id: string): Promise<void>;
+  cleanupExpiredAccessTokens(): Promise<void>;
   
   createOAuth2RefreshToken(token: any): Promise<any>;
-  getOAuth2RefreshToken(token: string): Promise<any>;
+  getOAuth2RefreshTokenByHash(tokenHash: string): Promise<any>;
   deleteOAuth2RefreshToken(id: string): Promise<void>;
+  cleanupExpiredRefreshTokens(): Promise<void>;
 }
 
 export class DbStorage implements IStorage {
@@ -659,20 +662,30 @@ export class DbStorage implements IStorage {
     return newClient;
   }
 
-  async getOAuth2Client(clientId: string): Promise<any> {
+  async getOAuth2Client(clientId: string, tenantId?: string): Promise<any> {
+    const conditions = [eq(oauth2Clients.clientId, clientId)];
+    if (tenantId) {
+      conditions.push(eq(oauth2Clients.tenantId, tenantId));
+    }
+    
     const [client] = await db
       .select()
       .from(oauth2Clients)
-      .where(eq(oauth2Clients.clientId, clientId))
+      .where(and(...conditions))
       .limit(1);
     return client;
   }
 
-  async getOAuth2ClientById(id: string): Promise<any> {
+  async getOAuth2ClientById(id: string, tenantId?: string): Promise<any> {
+    const conditions = [eq(oauth2Clients.id, id)];
+    if (tenantId) {
+      conditions.push(eq(oauth2Clients.tenantId, tenantId));
+    }
+    
     const [client] = await db
       .select()
       .from(oauth2Clients)
-      .where(eq(oauth2Clients.id, id))
+      .where(and(...conditions))
       .limit(1);
     return client;
   }
@@ -685,17 +698,24 @@ export class DbStorage implements IStorage {
       .orderBy(desc(oauth2Clients.createdAt));
   }
 
-  async updateOAuth2Client(id: string, data: any): Promise<any> {
+  async updateOAuth2Client(id: string, tenantId: string, data: any): Promise<any> {
     const [updated] = await db
       .update(oauth2Clients)
       .set({ ...data, updatedAt: new Date() })
-      .where(eq(oauth2Clients.id, id))
+      .where(and(
+        eq(oauth2Clients.id, id),
+        eq(oauth2Clients.tenantId, tenantId)
+      ))
       .returning();
     return updated;
   }
 
-  async deleteOAuth2Client(id: string): Promise<void> {
-    await db.delete(oauth2Clients).where(eq(oauth2Clients.id, id));
+  async deleteOAuth2Client(id: string, tenantId: string): Promise<void> {
+    // Cascade delete handled by database foreign keys
+    await db.delete(oauth2Clients).where(and(
+      eq(oauth2Clients.id, id),
+      eq(oauth2Clients.tenantId, tenantId)
+    ));
   }
 
   async createOAuth2AuthorizationCode(code: any): Promise<any> {
@@ -703,12 +723,12 @@ export class DbStorage implements IStorage {
     return newCode;
   }
 
-  async getOAuth2AuthorizationCode(code: string): Promise<any> {
+  async getOAuth2AuthorizationCodeByHash(codeHash: string): Promise<any> {
     const [authCode] = await db
       .select()
       .from(oauth2AuthorizationCodes)
       .where(and(
-        eq(oauth2AuthorizationCodes.code, code),
+        eq(oauth2AuthorizationCodes.codeHash, codeHash),
         sql`${oauth2AuthorizationCodes.expiresAt} > NOW()`
       ))
       .limit(1);
@@ -719,17 +739,22 @@ export class DbStorage implements IStorage {
     await db.delete(oauth2AuthorizationCodes).where(eq(oauth2AuthorizationCodes.id, id));
   }
 
+  async cleanupExpiredAuthorizationCodes(): Promise<void> {
+    await db.delete(oauth2AuthorizationCodes)
+      .where(sql`${oauth2AuthorizationCodes.expiresAt} <= NOW()`);
+  }
+
   async createOAuth2AccessToken(token: any): Promise<any> {
     const [newToken] = await db.insert(oauth2AccessTokens).values(token).returning();
     return newToken;
   }
 
-  async getOAuth2AccessToken(token: string): Promise<any> {
+  async getOAuth2AccessTokenByHash(tokenHash: string): Promise<any> {
     const [accessToken] = await db
       .select()
       .from(oauth2AccessTokens)
       .where(and(
-        eq(oauth2AccessTokens.token, token),
+        eq(oauth2AccessTokens.tokenHash, tokenHash),
         sql`${oauth2AccessTokens.expiresAt} > NOW()`
       ))
       .limit(1);
@@ -740,17 +765,22 @@ export class DbStorage implements IStorage {
     await db.delete(oauth2AccessTokens).where(eq(oauth2AccessTokens.id, id));
   }
 
+  async cleanupExpiredAccessTokens(): Promise<void> {
+    await db.delete(oauth2AccessTokens)
+      .where(sql`${oauth2AccessTokens.expiresAt} <= NOW()`);
+  }
+
   async createOAuth2RefreshToken(token: any): Promise<any> {
     const [newToken] = await db.insert(oauth2RefreshTokens).values(token).returning();
     return newToken;
   }
 
-  async getOAuth2RefreshToken(token: string): Promise<any> {
+  async getOAuth2RefreshTokenByHash(tokenHash: string): Promise<any> {
     const [refreshToken] = await db
       .select()
       .from(oauth2RefreshTokens)
       .where(and(
-        eq(oauth2RefreshTokens.token, token),
+        eq(oauth2RefreshTokens.tokenHash, tokenHash),
         sql`${oauth2RefreshTokens.expiresAt} > NOW()`
       ))
       .limit(1);
@@ -759,6 +789,11 @@ export class DbStorage implements IStorage {
 
   async deleteOAuth2RefreshToken(id: string): Promise<void> {
     await db.delete(oauth2RefreshTokens).where(eq(oauth2RefreshTokens.id, id));
+  }
+
+  async cleanupExpiredRefreshTokens(): Promise<void> {
+    await db.delete(oauth2RefreshTokens)
+      .where(sql`${oauth2RefreshTokens.expiresAt} <= NOW()`);
   }
 }
 
