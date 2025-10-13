@@ -12,6 +12,7 @@ import {
   auditLogs,
   oauthAccounts,
   mfaSecrets,
+  mfaOtpTokens,
   webauthnCredentials,
   trustedDevices,
   emailVerificationTokens,
@@ -63,6 +64,11 @@ export interface IStorage {
   createMfaSecret(secret: any): Promise<any>;
   getMfaSecret(userId: string): Promise<any>;
   deleteMfaSecret(userId: string): Promise<void>;
+  
+  // MFA OTP operations
+  createMfaOtpToken(token: any): Promise<any>;
+  getMfaOtpToken(userId: string, code: string): Promise<any>;
+  deleteMfaOtpToken(userId: string): Promise<void>;
 
   // Tenant operations
   getTenant(id: string): Promise<Tenant | undefined>;
@@ -529,6 +535,28 @@ export class DbStorage implements IStorage {
 
   async deleteMfaSecret(userId: string): Promise<void> {
     await db.delete(mfaSecrets).where(eq(mfaSecrets.userId, userId));
+  }
+
+  async createMfaOtpToken(token: any): Promise<any> {
+    const [newToken] = await db.insert(mfaOtpTokens).values(token).returning();
+    return newToken;
+  }
+
+  async getMfaOtpToken(userId: string, code: string): Promise<any> {
+    const [token] = await db
+      .select()
+      .from(mfaOtpTokens)
+      .where(and(
+        eq(mfaOtpTokens.userId, userId),
+        eq(mfaOtpTokens.code, code),
+        sql`${mfaOtpTokens.expiresAt} > NOW()`
+      ))
+      .limit(1);
+    return token;
+  }
+
+  async deleteMfaOtpToken(userId: string): Promise<void> {
+    await db.delete(mfaOtpTokens).where(eq(mfaOtpTokens.userId, userId));
   }
 }
 

@@ -1177,6 +1177,147 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ===== Email OTP MFA Routes =====
+
+  // Enable Email OTP MFA and send initial code
+  app.post("/api/user/mfa/email/enable", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const user = await storage.getUser(req.user.id);
+      if (!user) {
+        return res.status(404).json({ error: "User not found" });
+      }
+
+      // Generate OTP code
+      const code = emailService.generateOTP(6);
+      const expiresAt = new Date();
+      expiresAt.setMinutes(expiresAt.getMinutes() + 10);
+
+      // Delete old tokens
+      await storage.deleteMfaOtpToken(req.user.id);
+
+      // Create new OTP token
+      await storage.createMfaOtpToken({
+        userId: req.user.id,
+        code,
+        expiresAt,
+      });
+
+      // Send OTP code via email
+      await emailService.sendMFACode(user.email, code);
+
+      await auditLog(req, "mfa.email_setup_initiated", "user", req.user.id, {});
+
+      res.json({ message: "OTP sent to your email" });
+    } catch (error: any) {
+      console.error("Error enabling email OTP:", error);
+      res.status(500).json({ error: "Failed to enable email OTP" });
+    }
+  });
+
+  // Verify Email OTP and complete setup
+  app.post("/api/user/mfa/email/verify", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const { code } = req.body;
+
+      if (!code) {
+        return res.status(400).json({ error: "Code required" });
+      }
+
+      // Verify OTP
+      const token = await storage.getMfaOtpToken(req.user.id, code);
+      if (!token) {
+        return res.status(401).json({ error: "Invalid or expired code" });
+      }
+
+      // Enable MFA on user account
+      await storage.updateUser(req.user.id, {
+        mfaEnabled: true,
+        mfaMethod: "email",
+      });
+
+      // Delete used token
+      await storage.deleteMfaOtpToken(req.user.id);
+
+      await auditLog(req, "mfa.enabled", "user", req.user.id, { method: "email" });
+
+      res.json({ message: "Email OTP enabled successfully" });
+    } catch (error: any) {
+      console.error("Error verifying email OTP:", error);
+      res.status(500).json({ error: "Failed to verify email OTP" });
+    }
+  });
+
+  // Send Email OTP code
+  app.post("/api/user/mfa/email/send", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const user = await storage.getUser(req.user.id);
+      if (!user) {
+        return res.status(404).json({ error: "User not found" });
+      }
+
+      // Generate OTP code
+      const code = emailService.generateOTP(6);
+      const expiresAt = new Date();
+      expiresAt.setMinutes(expiresAt.getMinutes() + 10);
+
+      // Delete old tokens
+      await storage.deleteMfaOtpToken(req.user.id);
+
+      // Create new OTP token
+      await storage.createMfaOtpToken({
+        userId: req.user.id,
+        code,
+        expiresAt,
+      });
+
+      // Send OTP code via email
+      await emailService.sendMFACode(user.email, code);
+
+      res.json({ message: "OTP sent to your email" });
+    } catch (error: any) {
+      console.error("Error sending email OTP:", error);
+      res.status(500).json({ error: "Failed to send email OTP" });
+    }
+  });
+
+  // Disable Email OTP MFA
+  app.post("/api/user/mfa/email/disable", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const { password } = req.body;
+
+      if (!password) {
+        return res.status(400).json({ error: "Password required" });
+      }
+
+      // Verify password
+      const user = await storage.getUser(req.user.id);
+      if (!user || !user.passwordHash) {
+        return res.status(400).json({ error: "Invalid request" });
+      }
+
+      const validPassword = await verifyPassword(password, user.passwordHash);
+      if (!validPassword) {
+        return res.status(401).json({ error: "Invalid password" });
+      }
+
+      // Disable MFA
+      await storage.updateUser(req.user.id, {
+        mfaEnabled: false,
+        mfaMethod: null,
+      });
+
+      // Delete any pending OTP tokens
+      await storage.deleteMfaOtpToken(req.user.id);
+
+      await auditLog(req, "mfa.disabled", "user", req.user.id, {});
+
+      res.json({ message: "Email OTP disabled successfully" });
+    } catch (error: any) {
+      console.error("Error disabling email OTP:", error);
+      res.status(500).json({ error: "Failed to disable email OTP" });
+    }
+  });
+
   // ===== User Routes =====
 
   app.get("/api/user/stats", requireAuth, async (req: Request, res: Response) => {
