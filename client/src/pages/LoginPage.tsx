@@ -40,12 +40,9 @@ export default function LoginPage() {
     mutationFn: async (data: LoginInput) => {
       return apiRequest("POST", "/api/auth/login", data) as Promise<any>;
     },
-    onSuccess: async (data: any) => {
-      // Update the auth context immediately
+    onSuccess: (data: any) => {
+      // Set the user data directly - don't invalidate as the cookie needs time to be processed
       queryClient.setQueryData(["/api/auth/me"], { user: data.user });
-      
-      // Invalidate to trigger refresh
-      await queryClient.invalidateQueries({ queryKey: ["/api/auth/me"] });
       
       if (data.requiresMfa) {
         setLocation("/auth/mfa");
