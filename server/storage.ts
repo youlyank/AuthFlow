@@ -23,6 +23,8 @@ import {
   oauth2AuthorizationCodes,
   oauth2AccessTokens,
   oauth2RefreshTokens,
+  webhooks,
+  webhookDeliveries,
   type InsertUser,
   type InsertTenant,
   type InsertPlan,
@@ -152,6 +154,21 @@ export interface IStorage {
   getOAuth2RefreshTokenByHash(tokenHash: string): Promise<any>;
   deleteOAuth2RefreshToken(id: string): Promise<void>;
   cleanupExpiredRefreshTokens(): Promise<void>;
+
+  // Webhook operations
+  createWebhook(webhook: any): Promise<any>;
+  getWebhook(id: string, tenantId: string): Promise<any>;
+  listWebhooks(tenantId: string): Promise<any[]>;
+  updateWebhook(id: string, tenantId: string, data: any): Promise<any>;
+  deleteWebhook(id: string, tenantId: string): Promise<void>;
+
+  // Webhook delivery operations
+  createWebhookDelivery(delivery: any): Promise<any>;
+  getWebhookDelivery(id: string): Promise<any>;
+  listWebhookDeliveries(webhookId?: string, tenantId?: string, limit?: number): Promise<any[]>;
+  updateWebhookDelivery(id: string, data: any): Promise<any>;
+  getPendingWebhookDeliveries(limit?: number): Promise<any[]>;
+  claimWebhookDelivery(id: string): Promise<boolean>;
 }
 
 export class DbStorage implements IStorage {
@@ -853,6 +870,114 @@ export class DbStorage implements IStorage {
   async cleanupExpiredRefreshTokens(): Promise<void> {
     await db.delete(oauth2RefreshTokens)
       .where(sql`${oauth2RefreshTokens.expiresAt} <= NOW()`);
+  }
+
+  // Webhook operations
+  async createWebhook(webhook: any): Promise<any> {
+    const [newWebhook] = await db.insert(webhooks).values(webhook).returning();
+    return newWebhook;
+  }
+
+  async getWebhook(id: string, tenantId: string): Promise<any> {
+    const [webhook] = await db
+      .select()
+      .from(webhooks)
+      .where(and(
+        eq(webhooks.id, id),
+        eq(webhooks.tenantId, tenantId)
+      ))
+      .limit(1);
+    return webhook;
+  }
+
+  async listWebhooks(tenantId: string): Promise<any[]> {
+    return db
+      .select()
+      .from(webhooks)
+      .where(eq(webhooks.tenantId, tenantId))
+      .orderBy(desc(webhooks.createdAt));
+  }
+
+  async updateWebhook(id: string, tenantId: string, data: any): Promise<any> {
+    const [updated] = await db
+      .update(webhooks)
+      .set({ ...data, updatedAt: new Date() })
+      .where(and(
+        eq(webhooks.id, id),
+        eq(webhooks.tenantId, tenantId)
+      ))
+      .returning();
+    return updated;
+  }
+
+  async deleteWebhook(id: string, tenantId: string): Promise<void> {
+    await db.delete(webhooks).where(and(
+      eq(webhooks.id, id),
+      eq(webhooks.tenantId, tenantId)
+    ));
+  }
+
+  // Webhook delivery operations
+  async createWebhookDelivery(delivery: any): Promise<any> {
+    const [newDelivery] = await db.insert(webhookDeliveries).values(delivery).returning();
+    return newDelivery;
+  }
+
+  async getWebhookDelivery(id: string): Promise<any> {
+    const [delivery] = await db
+      .select()
+      .from(webhookDeliveries)
+      .where(eq(webhookDeliveries.id, id))
+      .limit(1);
+    return delivery;
+  }
+
+  async listWebhookDeliveries(webhookId?: string, tenantId?: string, limit = 100): Promise<any[]> {
+    const conditions = [];
+    if (webhookId) conditions.push(eq(webhookDeliveries.webhookId, webhookId));
+    if (tenantId) conditions.push(eq(webhookDeliveries.tenantId, tenantId));
+
+    const query = conditions.length > 0
+      ? db.select().from(webhookDeliveries).where(and(...conditions)).orderBy(desc(webhookDeliveries.createdAt)).limit(limit)
+      : db.select().from(webhookDeliveries).orderBy(desc(webhookDeliveries.createdAt)).limit(limit);
+
+    return query;
+  }
+
+  async updateWebhookDelivery(id: string, data: any): Promise<any> {
+    const [updated] = await db
+      .update(webhookDeliveries)
+      .set(data)
+      .where(eq(webhookDeliveries.id, id))
+      .returning();
+    return updated;
+  }
+
+  async getPendingWebhookDeliveries(limit = 100): Promise<any[]> {
+    return db
+      .select()
+      .from(webhookDeliveries)
+      .where(and(
+        eq(webhookDeliveries.status, "pending"),
+        sql`(${webhookDeliveries.nextRetryAt} IS NULL OR ${webhookDeliveries.nextRetryAt} <= NOW())`
+      ))
+      .orderBy(webhookDeliveries.createdAt)
+      .limit(limit);
+  }
+
+  async claimWebhookDelivery(id: string): Promise<boolean> {
+    // Atomically claim delivery by updating status to "processing"
+    // Returns true if claimed, false if already claimed by another worker
+    const [result] = await db
+      .update(webhookDeliveries)
+      .set({ status: "processing" })
+      .where(and(
+        eq(webhookDeliveries.id, id),
+        eq(webhookDeliveries.status, "pending")
+      ))
+      .returning({ id: webhookDeliveries.id });
+    
+    return !!result;
   }
 }
 

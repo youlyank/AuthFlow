@@ -18,6 +18,7 @@ import {
   verifyOAuth2Secret,
   generateAPIKey,
 } from "./auth";
+import { generateWebhookSecret } from "./webhooks";
 import { loginSchema, registerSchema, mfaVerifySchema, createNotificationSchema, passwordResetRequestSchema, passwordResetSchema, updateTenantSettingsSchema } from "@shared/schema";
 import { emailService } from "./email";
 import speakeasy from "speakeasy";
@@ -1594,6 +1595,178 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error: any) {
       console.error("Error deleting API key:", error);
       res.status(500).json({ error: "Failed to delete API key" });
+    }
+  });
+
+  // ===== Webhook Management Endpoints =====
+
+  // Create Webhook
+  app.post("/api/admin/webhooks", requireAuth, requireRole(["tenant_admin", "super_admin"], "webhooks:write"), async (req: Request, res: Response) => {
+    try {
+      const { url, events, description } = req.body;
+
+      if (!url || !events || !Array.isArray(events) || events.length === 0) {
+        return res.status(400).json({ error: "URL and events array are required" });
+      }
+
+      // Validate URL
+      try {
+        new URL(url);
+      } catch {
+        return res.status(400).json({ error: "Invalid URL format" });
+      }
+
+      // Generate webhook secret
+      const secret = generateWebhookSecret();
+
+      const webhook = await storage.createWebhook({
+        tenantId: req.user.tenantId,
+        url,
+        events,
+        secret,
+        description: description || null,
+        isActive: true,
+      });
+
+      await auditLog(req, "webhook.created", "webhook", webhook.id, { url, events });
+
+      res.status(201).json({
+        id: webhook.id,
+        url: webhook.url,
+        events: webhook.events,
+        secret: webhook.secret, // Only returned on creation
+        description: webhook.description,
+        isActive: webhook.isActive,
+        createdAt: webhook.createdAt,
+      });
+    } catch (error: any) {
+      console.error("Error creating webhook:", error);
+      res.status(500).json({ error: "Failed to create webhook" });
+    }
+  });
+
+  // List Webhooks
+  app.get("/api/admin/webhooks", requireAuth, requireRole(["tenant_admin", "super_admin"], "webhooks:read"), async (req: Request, res: Response) => {
+    try {
+      const webhooks = await storage.listWebhooks(req.user.tenantId!);
+
+      // Don't return secret in list
+      const sanitized = webhooks.map(w => ({
+        id: w.id,
+        url: w.url,
+        events: w.events,
+        description: w.description,
+        isActive: w.isActive,
+        createdAt: w.createdAt,
+        updatedAt: w.updatedAt,
+      }));
+
+      res.json(sanitized);
+    } catch (error: any) {
+      console.error("Error listing webhooks:", error);
+      res.status(500).json({ error: "Failed to list webhooks" });
+    }
+  });
+
+  // Get Webhook
+  app.get("/api/admin/webhooks/:id", requireAuth, requireRole(["tenant_admin", "super_admin"], "webhooks:read"), async (req: Request, res: Response) => {
+    try {
+      const webhook = await storage.getWebhook(req.params.id, req.user.tenantId!);
+
+      if (!webhook) {
+        return res.status(404).json({ error: "Webhook not found" });
+      }
+
+      // Don't return secret after creation
+      const { secret, ...webhookData } = webhook;
+
+      res.json(webhookData);
+    } catch (error: any) {
+      console.error("Error getting webhook:", error);
+      res.status(500).json({ error: "Failed to get webhook" });
+    }
+  });
+
+  // Update Webhook
+  app.put("/api/admin/webhooks/:id", requireAuth, requireRole(["tenant_admin", "super_admin"], "webhooks:write"), async (req: Request, res: Response) => {
+    try {
+      const { url, events, description, isActive } = req.body;
+
+      const updateData: any = {};
+      if (url !== undefined) {
+        try {
+          new URL(url);
+          updateData.url = url;
+        } catch {
+          return res.status(400).json({ error: "Invalid URL format" });
+        }
+      }
+      if (events !== undefined) updateData.events = events;
+      if (description !== undefined) updateData.description = description;
+      if (isActive !== undefined) updateData.isActive = isActive;
+
+      const webhook = await storage.updateWebhook(req.params.id, req.user.tenantId!, updateData);
+
+      if (!webhook) {
+        return res.status(404).json({ error: "Webhook not found" });
+      }
+
+      await auditLog(req, "webhook.updated", "webhook", webhook.id, updateData);
+
+      // Don't return secret
+      const { secret, ...webhookData } = webhook;
+      res.json(webhookData);
+    } catch (error: any) {
+      console.error("Error updating webhook:", error);
+      res.status(500).json({ error: "Failed to update webhook" });
+    }
+  });
+
+  // Delete Webhook
+  app.delete("/api/admin/webhooks/:id", requireAuth, requireRole(["tenant_admin", "super_admin"], "webhooks:write"), async (req: Request, res: Response) => {
+    try {
+      await storage.deleteWebhook(req.params.id, req.user.tenantId!);
+      await auditLog(req, "webhook.deleted", "webhook", req.params.id);
+      res.json({ message: "Webhook deleted" });
+    } catch (error: any) {
+      console.error("Error deleting webhook:", error);
+      res.status(500).json({ error: "Failed to delete webhook" });
+    }
+  });
+
+  // Regenerate Webhook Secret
+  app.post("/api/admin/webhooks/:id/regenerate-secret", requireAuth, requireRole(["tenant_admin", "super_admin"], "webhooks:write"), async (req: Request, res: Response) => {
+    try {
+      const newSecret = generateWebhookSecret();
+      
+      const webhook = await storage.updateWebhook(req.params.id, req.user.tenantId!, {
+        secret: newSecret,
+      });
+
+      if (!webhook) {
+        return res.status(404).json({ error: "Webhook not found" });
+      }
+
+      await auditLog(req, "webhook.secret_regenerated", "webhook", webhook.id);
+
+      res.json({
+        secret: newSecret,
+        message: "Secret regenerated successfully",
+      });
+    } catch (error: any) {
+      console.error("Error regenerating webhook secret:", error);
+      res.status(500).json({ error: "Failed to regenerate secret" });
+    }
+  });
+
+  // List Webhook Deliveries
+  app.get("/api/admin/webhooks/:id/deliveries", requireAuth, requireRole(["tenant_admin", "super_admin"], "webhooks:read"), async (req: Request, res: Response) => {
+    try {
+      const deliveries = await storage.listWebhookDeliveries(req.params.id, req.user.tenantId!, 100);
+      res.json(deliveries);
+    } catch (error: any) {
+      console.error("Error listing webhook deliveries:", error);
+      res.status(500).json({ error: "Failed to list deliveries" });
     }
   });
 

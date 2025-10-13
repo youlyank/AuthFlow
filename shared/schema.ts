@@ -30,6 +30,29 @@ export const notificationTypeEnum = pgEnum("notification_type", [
 ]);
 export const mfaMethodEnum = pgEnum("mfa_method", ["email", "totp", "sms"]);
 
+// Webhook event types
+export const webhookEventEnum = pgEnum("webhook_event", [
+  "user.created",
+  "user.updated",
+  "user.deleted",
+  "user.login",
+  "user.logout",
+  "user.password_reset",
+  "user.email_verified",
+  "session.created",
+  "session.expired",
+  "mfa.enabled",
+  "mfa.disabled",
+  "subscription.updated",
+]);
+
+export const webhookDeliveryStatusEnum = pgEnum("webhook_delivery_status", [
+  "pending",
+  "processing",
+  "success",
+  "failed",
+]);
+
 // Tenants table
 export const tenants = pgTable("tenants", {
   id: varchar("id")
@@ -700,6 +723,80 @@ export type OAuth2Client = typeof oauth2Clients.$inferSelect;
 export type OAuth2AuthorizationCode = typeof oauth2AuthorizationCodes.$inferSelect;
 export type OAuth2AccessToken = typeof oauth2AccessTokens.$inferSelect;
 export type OAuth2RefreshToken = typeof oauth2RefreshTokens.$inferSelect;
+
+// Webhooks table
+export const webhooks = pgTable(
+  "webhooks",
+  {
+    id: varchar("id")
+      .primaryKey()
+      .default(sql`gen_random_uuid()`),
+    tenantId: varchar("tenant_id")
+      .notNull()
+      .references(() => tenants.id, { onDelete: "cascade" }),
+    url: text("url").notNull(),
+    events: text("events").array().notNull().default(sql`'{}'::text[]`), // array of event types
+    secret: text("secret").notNull(), // for signature verification (HMAC SHA256)
+    isActive: boolean("is_active").notNull().default(true),
+    description: text("description"),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+    updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  },
+  (table) => ({
+    tenantIdIdx: index("webhooks_tenant_id_idx").on(table.tenantId),
+  }),
+);
+
+// Webhook deliveries table (for tracking delivery attempts)
+export const webhookDeliveries = pgTable(
+  "webhook_deliveries",
+  {
+    id: varchar("id")
+      .primaryKey()
+      .default(sql`gen_random_uuid()`),
+    webhookId: varchar("webhook_id")
+      .notNull()
+      .references(() => webhooks.id, { onDelete: "cascade" }),
+    tenantId: varchar("tenant_id")
+      .notNull()
+      .references(() => tenants.id, { onDelete: "cascade" }),
+    event: text("event").notNull(),
+    payload: jsonb("payload").notNull(),
+    responseStatus: integer("response_status"),
+    responseBody: text("response_body"),
+    status: webhookDeliveryStatusEnum("status").notNull().default("pending"),
+    attempts: integer("attempts").notNull().default(0),
+    maxAttempts: integer("max_attempts").notNull().default(3),
+    nextRetryAt: timestamp("next_retry_at"),
+    deliveredAt: timestamp("delivered_at"),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+  },
+  (table) => ({
+    webhookIdIdx: index("webhook_deliveries_webhook_id_idx").on(table.webhookId),
+    tenantIdIdx: index("webhook_deliveries_tenant_id_idx").on(table.tenantId),
+    statusIdx: index("webhook_deliveries_status_idx").on(table.status),
+  }),
+);
+
+// Insert Schemas
+export const insertWebhookSchema = createInsertSchema(webhooks).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertWebhookDeliverySchema = createInsertSchema(webhookDeliveries).omit({
+  id: true,
+  createdAt: true,
+});
+
+// Insert Types
+export type InsertWebhook = z.infer<typeof insertWebhookSchema>;
+export type InsertWebhookDelivery = z.infer<typeof insertWebhookDeliverySchema>;
+
+// Select Types
+export type Webhook = typeof webhooks.$inferSelect;
+export type WebhookDelivery = typeof webhookDeliveries.$inferSelect;
 
 // Extended schemas for forms
 export const registerSchema = z.object({
