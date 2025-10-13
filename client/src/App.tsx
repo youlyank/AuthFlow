@@ -26,6 +26,7 @@ import UserDashboard from "@/pages/UserDashboard";
 import SecuritySettings from "@/pages/SecuritySettings";
 import WebhookManagement from "@/pages/WebhookManagement";
 import ApiKeyManagement from "@/pages/ApiKeyManagement";
+import OAuth2ConsentPage from "@/pages/OAuth2ConsentPage";
 
 function ProtectedRoute({ children, allowedRoles }: { children: React.ReactNode; allowedRoles?: string[] }) {
   const { user, isLoading } = useAuth();
@@ -88,6 +89,13 @@ function Router() {
       <Route path="/auth/register" component={RegisterPage} />
       <Route path="/auth/mfa" component={MfaVerifyPage} />
       <Route path="/auth/forgot-password" component={ForgotPasswordPage} />
+
+      {/* OAuth2 Consent */}
+      <Route path="/oauth2/consent">
+        <ProtectedRoute>
+          <OAuth2ConsentPage />
+        </ProtectedRoute>
+      </Route>
 
       {/* Protected routes */}
       <Route path="/super-admin">

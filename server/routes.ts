@@ -1772,7 +1772,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // ===== OAuth2/OIDC Provider Endpoints =====
 
-  // OAuth2 Authorization Endpoint
+  // OAuth2 Authorization Endpoint - Redirects to consent screen
   app.get("/oauth2/authorize", requireAuth, async (req: Request, res: Response) => {
     try {
       const {
@@ -1790,15 +1790,122 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "invalid_request", error_description: "Missing required parameters" });
       }
 
-      // Verify client exists and owns this tenant
+      // Verify client exists and tenant owns it
       const client = await storage.getOAuth2Client(client_id as string);
       if (!client) {
         return res.status(400).json({ error: "invalid_client", error_description: "Client not found" });
       }
 
+      // Verify tenant ownership
+      if (client.tenantId !== req.user.tenantId) {
+        return res.status(403).json({ error: "forbidden", error_description: "Client belongs to different tenant" });
+      }
+
       // Verify redirect URI matches registered URIs
       if (!client.redirectUris.includes(redirect_uri as string)) {
         return res.status(400).json({ error: "invalid_request", error_description: "Invalid redirect_uri" });
+      }
+
+      // Store authorization request in session for integrity
+      const authRequestId = randomBytes(32).toString("hex");
+      req.session.oauth2AuthRequest = {
+        id: authRequestId,
+        clientId: client_id as string,
+        redirectUri: redirect_uri as string,
+        responseType: response_type as string,
+        scope: scope as string || "openid profile email",
+        state: state as string || null,
+        codeChallenge: code_challenge as string || null,
+        codeChallengeMethod: code_challenge_method as string || null,
+        userId: req.user.id,
+        tenantId: req.user.tenantId,
+      };
+
+      // Redirect to consent screen with session ID
+      const consentUrl = new URL("/oauth2/consent", `${req.protocol}://${req.get("host")}`);
+      consentUrl.searchParams.set("request_id", authRequestId);
+
+      res.redirect(consentUrl.toString());
+    } catch (error: any) {
+      console.error("OAuth2 authorization error:", error);
+      res.status(500).json({ error: "server_error", error_description: "Authorization failed" });
+    }
+  });
+
+  // Get OAuth2 Authorization Request (for consent screen)
+  app.get("/api/oauth2/auth-request/:request_id", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const authRequest = req.session.oauth2AuthRequest;
+      
+      if (!authRequest || authRequest.id !== req.params.request_id) {
+        return res.status(404).json({ error: "Authorization request not found or expired" });
+      }
+
+      // Verify user owns this request
+      if (authRequest.userId !== req.user.id) {
+        return res.status(403).json({ error: "Forbidden" });
+      }
+
+      // Get client info
+      const client = await storage.getOAuth2Client(authRequest.clientId);
+      if (!client) {
+        return res.status(404).json({ error: "Client not found" });
+      }
+
+      // Return request info with client details
+      res.json({
+        clientId: authRequest.clientId,
+        clientName: client.name,
+        clientDescription: client.description,
+        scope: authRequest.scope,
+        redirectUri: authRequest.redirectUri,
+      });
+    } catch (error: any) {
+      console.error("Error getting auth request:", error);
+      res.status(500).json({ error: "Failed to get authorization request" });
+    }
+  });
+
+  // Handle OAuth2 Consent
+  app.post("/api/oauth2/consent", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const { request_id, approved } = req.body;
+
+      // Retrieve authorization request from session
+      const authRequest = req.session.oauth2AuthRequest;
+      
+      if (!authRequest || authRequest.id !== request_id) {
+        return res.status(400).json({ error: "invalid_request", error_description: "Authorization request not found or expired" });
+      }
+
+      // Verify user owns this request
+      if (authRequest.userId !== req.user.id) {
+        return res.status(403).json({ error: "forbidden" });
+      }
+
+      // Verify client still exists and tenant ownership
+      const client = await storage.getOAuth2Client(authRequest.clientId);
+      if (!client || client.tenantId !== authRequest.tenantId) {
+        return res.status(400).json({ error: "invalid_client" });
+      }
+
+      // Verify redirect URI still valid
+      if (!client.redirectUris.includes(authRequest.redirectUri)) {
+        return res.status(400).json({ error: "invalid_redirect_uri" });
+      }
+
+      const redirectUrl = new URL(authRequest.redirectUri);
+
+      // If user denied consent
+      if (!approved) {
+        redirectUrl.searchParams.set("error", "access_denied");
+        redirectUrl.searchParams.set("error_description", "User denied authorization");
+        if (authRequest.state) redirectUrl.searchParams.set("state", authRequest.state);
+        
+        // Clear session
+        delete req.session.oauth2AuthRequest;
+        
+        return res.json({ redirect_url: redirectUrl.toString() });
       }
 
       // Generate authorization code
@@ -1808,24 +1915,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Store authorization code with 10 minute expiry
       await storage.createOAuth2AuthorizationCode({
         codeHash,
-        clientId: client_id as string,
-        userId: req.user.id,
-        redirectUri: redirect_uri as string,
-        scopes: (scope as string)?.split(" ") || ["openid", "profile", "email"],
-        codeChallenge: code_challenge as string || null,
-        codeChallengeMethod: code_challenge_method as string || null,
+        clientId: authRequest.clientId,
+        userId: authRequest.userId,
+        redirectUri: authRequest.redirectUri,
+        scopes: authRequest.scope.split(" ").filter(Boolean),
+        codeChallenge: authRequest.codeChallenge,
+        codeChallengeMethod: authRequest.codeChallengeMethod,
         expiresAt: new Date(Date.now() + 10 * 60 * 1000), // 10 minutes
       });
 
       // Redirect back to client with code
-      const redirectUrl = new URL(redirect_uri as string);
       redirectUrl.searchParams.set("code", code);
-      if (state) redirectUrl.searchParams.set("state", state as string);
+      if (authRequest.state) redirectUrl.searchParams.set("state", authRequest.state);
 
-      res.redirect(redirectUrl.toString());
+      // Clear session
+      delete req.session.oauth2AuthRequest;
+
+      res.json({ redirect_url: redirectUrl.toString() });
     } catch (error: any) {
-      console.error("OAuth2 authorization error:", error);
-      res.status(500).json({ error: "server_error", error_description: "Authorization failed" });
+      console.error("OAuth2 consent error:", error);
+      res.status(500).json({ error: "server_error" });
     }
   });
 
