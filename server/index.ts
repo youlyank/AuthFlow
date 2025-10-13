@@ -3,6 +3,7 @@ import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 import { startWebhookScheduler } from "./webhooks";
+import { startOAuth2CleanupScheduler } from "./oauth2-cleanup";
 
 const app = express();
 app.use(express.json());
@@ -60,6 +61,9 @@ app.use((req, res, next) => {
 
   // Start webhook delivery scheduler (checks every minute)
   startWebhookScheduler(60000);
+  
+  // Start OAuth2 token cleanup scheduler (checks every hour)
+  startOAuth2CleanupScheduler(3600000);
 
   // ALWAYS serve the app on the port specified in the environment variable PORT
   // Other ports are firewalled. Default to 5000 if not specified.
