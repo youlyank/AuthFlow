@@ -88,6 +88,31 @@ function DashboardLayout({ children }: { children: React.ReactNode }) {
   );
 }
 
+function DefaultRedirect() {
+  const { user, isLoading } = useAuth();
+  
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
+      </div>
+    );
+  }
+  
+  if (!user) {
+    return <Redirect to="/auth/login" />;
+  }
+  
+  // Redirect based on role
+  if (user.role === "super_admin") {
+    return <Redirect to="/super-admin" />;
+  } else if (user.role === "tenant_admin") {
+    return <Redirect to="/admin" />;
+  } else {
+    return <Redirect to="/dashboard" />;
+  }
+}
+
 function Router() {
   return (
     <Switch>
@@ -201,9 +226,9 @@ function Router() {
         </ProtectedRoute>
       </Route>
 
-      {/* Default redirect */}
+      {/* Default redirect - smart routing based on auth */}
       <Route path="/">
-        <Redirect to="/auth/login" />
+        <DefaultRedirect />
       </Route>
 
       {/* 404 */}

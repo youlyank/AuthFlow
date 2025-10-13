@@ -44,20 +44,14 @@ export default function LoginPage() {
       // Update the auth context immediately
       queryClient.setQueryData(["/api/auth/me"], { user: data.user });
       
-      // Small delay to ensure state is fully updated
-      await new Promise(resolve => setTimeout(resolve, 100));
+      // Invalidate to trigger refresh
+      await queryClient.invalidateQueries({ queryKey: ["/api/auth/me"] });
       
       if (data.requiresMfa) {
         setLocation("/auth/mfa");
       } else {
-        const role = data.user?.role;
-        if (role === "super_admin") {
-          setLocation("/super-admin");
-        } else if (role === "tenant_admin") {
-          setLocation("/admin");
-        } else {
-          setLocation("/dashboard");
-        }
+        // Redirect to root - it will handle role-based routing
+        setLocation("/");
       }
     },
     onError: (error: Error) => {
