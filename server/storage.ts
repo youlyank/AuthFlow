@@ -122,6 +122,14 @@ export interface IStorage {
   getTenantAdminStats(tenantId: string): Promise<any>;
   getUserStats(userId: string): Promise<any>;
 
+  // API Key operations
+  createAPIKey(apiKey: any): Promise<any>;
+  getAPIKeyByHash(keyHash: string): Promise<any>;
+  listAPIKeys(tenantId: string): Promise<any[]>;
+  updateAPIKeyLastUsed(id: string): Promise<void>;
+  revokeAPIKey(id: string, tenantId: string): Promise<void>;
+  deleteAPIKey(id: string, tenantId: string): Promise<void>;
+
   // OAuth2 Provider operations
   createOAuth2Client(client: any): Promise<any>;
   getOAuth2Client(clientId: string, tenantId?: string): Promise<any>;
@@ -654,6 +662,57 @@ export class DbStorage implements IStorage {
 
   async deleteTrustedDevice(id: string): Promise<void> {
     await db.delete(trustedDevices).where(eq(trustedDevices.id, id));
+  }
+
+  // API Key operations
+  async createAPIKey(apiKey: any): Promise<any> {
+    const [newKey] = await db.insert(apiKeys).values(apiKey).returning();
+    return newKey;
+  }
+
+  async getAPIKeyByHash(keyHash: string): Promise<any> {
+    const [key] = await db
+      .select()
+      .from(apiKeys)
+      .where(and(
+        eq(apiKeys.keyHash, keyHash),
+        eq(apiKeys.isActive, true),
+        sql`(${apiKeys.expiresAt} IS NULL OR ${apiKeys.expiresAt} > NOW())`
+      ))
+      .limit(1);
+    return key;
+  }
+
+  async listAPIKeys(tenantId: string): Promise<any[]> {
+    return db
+      .select()
+      .from(apiKeys)
+      .where(eq(apiKeys.tenantId, tenantId))
+      .orderBy(desc(apiKeys.createdAt));
+  }
+
+  async updateAPIKeyLastUsed(id: string): Promise<void> {
+    await db
+      .update(apiKeys)
+      .set({ lastUsedAt: new Date() })
+      .where(eq(apiKeys.id, id));
+  }
+
+  async revokeAPIKey(id: string, tenantId: string): Promise<void> {
+    await db
+      .update(apiKeys)
+      .set({ isActive: false })
+      .where(and(
+        eq(apiKeys.id, id),
+        eq(apiKeys.tenantId, tenantId)
+      ));
+  }
+
+  async deleteAPIKey(id: string, tenantId: string): Promise<void> {
+    await db.delete(apiKeys).where(and(
+      eq(apiKeys.id, id),
+      eq(apiKeys.tenantId, tenantId)
+    ));
   }
 
   // OAuth2 Provider operations

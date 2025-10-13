@@ -437,7 +437,8 @@ export const apiKeys = pgTable(
       onDelete: "cascade",
     }),
     name: text("name").notNull(),
-    key: text("key").notNull().unique(),
+    keyHash: text("key_hash").notNull().unique(), // Hash of actual API key, never store plaintext!
+    keyPrefix: text("key_prefix").notNull(), // First 8 chars for identification (e.g., "ak_live_")
     permissions: jsonb("permissions")
       .notNull()
       .default(sql`'[]'::jsonb`),
@@ -451,7 +452,7 @@ export const apiKeys = pgTable(
   },
   (table) => ({
     tenantIdIdx: index("api_keys_tenant_id_idx").on(table.tenantId),
-    keyIdx: index("api_keys_key_idx").on(table.key),
+    keyHashIdx: index("api_keys_key_hash_idx").on(table.keyHash),
   }),
 );
 

@@ -11,6 +11,12 @@ import {
   requireAuth,
   requireRole,
   auditLog,
+  generateOAuth2Code,
+  generateOAuth2Token,
+  generateOAuth2Secret,
+  hashOAuth2Secret,
+  verifyOAuth2Secret,
+  generateAPIKey,
 } from "./auth";
 import { loginSchema, registerSchema, mfaVerifySchema, createNotificationSchema, passwordResetRequestSchema, passwordResetSchema, updateTenantSettingsSchema } from "@shared/schema";
 import { emailService } from "./email";
@@ -1498,6 +1504,377 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.error("Error creating notification:", error);
       res.status(400).json({ error: error.message || "Failed to create notification" });
     }
+  });
+
+  // ===== API Key Management Endpoints =====
+
+  // Create API Key (Tenant Admin Only)
+  app.post("/api/admin/api-keys", requireAuth, requireRole(["tenant_admin", "super_admin"], "api_keys:write"), async (req: Request, res: Response) => {
+    try {
+      const { name, permissions, expiresAt } = req.body;
+
+      if (!name) {
+        return res.status(400).json({ error: "Name is required" });
+      }
+
+      // Generate API key
+      const { key, keyHash, keyPrefix } = generateAPIKey();
+
+      // Create API key record
+      const apiKey = await storage.createAPIKey({
+        tenantId: req.user.tenantId,
+        name,
+        keyHash,
+        keyPrefix,
+        permissions: permissions || [],
+        expiresAt: expiresAt ? new Date(expiresAt) : null,
+        createdBy: req.user.id,
+      });
+
+      await auditLog(req, "api_key.created", "api_key", apiKey.id, { name });
+
+      // Return the actual key only once (won't be shown again)
+      res.status(201).json({
+        id: apiKey.id,
+        name: apiKey.name,
+        key, // Only returned on creation!
+        keyPrefix: apiKey.keyPrefix,
+        permissions: apiKey.permissions,
+        expiresAt: apiKey.expiresAt,
+        createdAt: apiKey.createdAt,
+      });
+    } catch (error: any) {
+      console.error("Error creating API key:", error);
+      res.status(500).json({ error: "Failed to create API key" });
+    }
+  });
+
+  // List API Keys
+  app.get("/api/admin/api-keys", requireAuth, requireRole(["tenant_admin", "super_admin"], "api_keys:read"), async (req: Request, res: Response) => {
+    try {
+      const apiKeys = await storage.listAPIKeys(req.user.tenantId!);
+
+      // Don't return key hash, only prefix for identification
+      const sanitized = apiKeys.map(k => ({
+        id: k.id,
+        name: k.name,
+        keyPrefix: k.keyPrefix,
+        permissions: k.permissions,
+        isActive: k.isActive,
+        expiresAt: k.expiresAt,
+        lastUsedAt: k.lastUsedAt,
+        createdAt: k.createdAt,
+      }));
+
+      res.json(sanitized);
+    } catch (error: any) {
+      console.error("Error listing API keys:", error);
+      res.status(500).json({ error: "Failed to list API keys" });
+    }
+  });
+
+  // Revoke API Key
+  app.put("/api/admin/api-keys/:id/revoke", requireAuth, requireRole(["tenant_admin", "super_admin"], "api_keys:write"), async (req: Request, res: Response) => {
+    try {
+      await storage.revokeAPIKey(req.params.id, req.user.tenantId!);
+      await auditLog(req, "api_key.revoked", "api_key", req.params.id);
+      res.json({ message: "API key revoked" });
+    } catch (error: any) {
+      console.error("Error revoking API key:", error);
+      res.status(500).json({ error: "Failed to revoke API key" });
+    }
+  });
+
+  // Delete API Key
+  app.delete("/api/admin/api-keys/:id", requireAuth, requireRole(["tenant_admin", "super_admin"], "api_keys:write"), async (req: Request, res: Response) => {
+    try {
+      await storage.deleteAPIKey(req.params.id, req.user.tenantId!);
+      await auditLog(req, "api_key.deleted", "api_key", req.params.id);
+      res.json({ message: "API key deleted" });
+    } catch (error: any) {
+      console.error("Error deleting API key:", error);
+      res.status(500).json({ error: "Failed to delete API key" });
+    }
+  });
+
+  // ===== OAuth2/OIDC Provider Endpoints =====
+
+  // OAuth2 Authorization Endpoint
+  app.get("/oauth2/authorize", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const {
+        client_id,
+        redirect_uri,
+        response_type,
+        scope,
+        state,
+        code_challenge,
+        code_challenge_method,
+      } = req.query;
+
+      // Validate required parameters
+      if (!client_id || !redirect_uri || !response_type) {
+        return res.status(400).json({ error: "invalid_request", error_description: "Missing required parameters" });
+      }
+
+      // Verify client exists and owns this tenant
+      const client = await storage.getOAuth2Client(client_id as string);
+      if (!client) {
+        return res.status(400).json({ error: "invalid_client", error_description: "Client not found" });
+      }
+
+      // Verify redirect URI matches registered URIs
+      if (!client.redirectUris.includes(redirect_uri as string)) {
+        return res.status(400).json({ error: "invalid_request", error_description: "Invalid redirect_uri" });
+      }
+
+      // Generate authorization code
+      const code = generateOAuth2Code();
+      const codeHash = hashOAuth2Secret(code);
+
+      // Store authorization code with 10 minute expiry
+      await storage.createOAuth2AuthorizationCode({
+        codeHash,
+        clientId: client_id as string,
+        userId: req.user.id,
+        redirectUri: redirect_uri as string,
+        scopes: (scope as string)?.split(" ") || ["openid", "profile", "email"],
+        codeChallenge: code_challenge as string || null,
+        codeChallengeMethod: code_challenge_method as string || null,
+        expiresAt: new Date(Date.now() + 10 * 60 * 1000), // 10 minutes
+      });
+
+      // Redirect back to client with code
+      const redirectUrl = new URL(redirect_uri as string);
+      redirectUrl.searchParams.set("code", code);
+      if (state) redirectUrl.searchParams.set("state", state as string);
+
+      res.redirect(redirectUrl.toString());
+    } catch (error: any) {
+      console.error("OAuth2 authorization error:", error);
+      res.status(500).json({ error: "server_error", error_description: "Authorization failed" });
+    }
+  });
+
+  // OAuth2 Token Endpoint
+  app.post("/oauth2/token", async (req: Request, res: Response) => {
+    try {
+      const {
+        grant_type,
+        code,
+        redirect_uri,
+        client_id,
+        client_secret,
+        refresh_token,
+        code_verifier,
+      } = req.body;
+
+      if (!grant_type) {
+        return res.status(400).json({ error: "invalid_request", error_description: "grant_type required" });
+      }
+
+      if (grant_type === "authorization_code") {
+        // Verify required parameters
+        if (!code || !redirect_uri || !client_id) {
+          return res.status(400).json({ error: "invalid_request", error_description: "Missing required parameters" });
+        }
+
+        // Get client and verify secret
+        const client = await storage.getOAuth2Client(client_id);
+        if (!client) {
+          return res.status(400).json({ error: "invalid_client" });
+        }
+
+        if (!verifyOAuth2Secret(client_secret, client.clientSecretHash)) {
+          return res.status(400).json({ error: "invalid_client", error_description: "Invalid client credentials" });
+        }
+
+        // Get and verify authorization code
+        const codeHash = hashOAuth2Secret(code);
+        const authCode = await storage.getOAuth2AuthorizationCodeByHash(codeHash);
+
+        if (!authCode) {
+          return res.status(400).json({ error: "invalid_grant", error_description: "Invalid or expired code" });
+        }
+
+        // Verify redirect URI matches
+        if (authCode.redirectUri !== redirect_uri) {
+          return res.status(400).json({ error: "invalid_grant", error_description: "redirect_uri mismatch" });
+        }
+
+        // Verify PKCE if present
+        if (authCode.codeChallenge) {
+          if (!code_verifier) {
+            return res.status(400).json({ error: "invalid_request", error_description: "code_verifier required" });
+          }
+          
+          const computedChallenge = authCode.codeChallengeMethod === "S256" 
+            ? createHash("sha256").update(code_verifier).digest("base64url")
+            : code_verifier;
+
+          if (computedChallenge !== authCode.codeChallenge) {
+            return res.status(400).json({ error: "invalid_grant", error_description: "PKCE validation failed" });
+          }
+        }
+
+        // Generate tokens
+        const accessToken = generateOAuth2Token();
+        const refreshToken = generateOAuth2Token();
+
+        const accessTokenHash = hashOAuth2Secret(accessToken);
+        const refreshTokenHash = hashOAuth2Secret(refreshToken);
+
+        // Store tokens
+        const tokenRecord = await storage.createOAuth2AccessToken({
+          tokenHash: accessTokenHash,
+          clientId: client_id,
+          userId: authCode.userId,
+          scopes: authCode.scopes,
+          expiresAt: new Date(Date.now() + 3600 * 1000), // 1 hour
+        });
+
+        await storage.createOAuth2RefreshToken({
+          tokenHash: refreshTokenHash,
+          accessTokenId: tokenRecord.id,
+          clientId: client_id,
+          userId: authCode.userId,
+          scopes: authCode.scopes,
+          expiresAt: new Date(Date.now() + 30 * 24 * 3600 * 1000), // 30 days
+        });
+
+        // Delete used authorization code
+        await storage.deleteOAuth2AuthorizationCode(authCode.id);
+
+        // Return tokens
+        res.json({
+          access_token: accessToken,
+          token_type: "Bearer",
+          expires_in: 3600,
+          refresh_token: refreshToken,
+          scope: authCode.scopes.join(" "),
+        });
+
+      } else if (grant_type === "refresh_token") {
+        if (!refresh_token || !client_id || !client_secret) {
+          return res.status(400).json({ error: "invalid_request", error_description: "Missing required parameters" });
+        }
+
+        // Verify client
+        const client = await storage.getOAuth2Client(client_id);
+        if (!client || !verifyOAuth2Secret(client_secret, client.clientSecretHash)) {
+          return res.status(400).json({ error: "invalid_client" });
+        }
+
+        // Get refresh token
+        const refreshTokenHash = hashOAuth2Secret(refresh_token);
+        const storedToken = await storage.getOAuth2RefreshTokenByHash(refreshTokenHash);
+
+        if (!storedToken) {
+          return res.status(400).json({ error: "invalid_grant", error_description: "Invalid refresh token" });
+        }
+
+        // Generate new access token
+        const newAccessToken = generateOAuth2Token();
+        const newAccessTokenHash = hashOAuth2Secret(newAccessToken);
+
+        await storage.createOAuth2AccessToken({
+          tokenHash: newAccessTokenHash,
+          clientId: client_id,
+          userId: storedToken.userId,
+          scopes: storedToken.scopes,
+          expiresAt: new Date(Date.now() + 3600 * 1000),
+        });
+
+        res.json({
+          access_token: newAccessToken,
+          token_type: "Bearer",
+          expires_in: 3600,
+          scope: storedToken.scopes.join(" "),
+        });
+
+      } else {
+        res.status(400).json({ error: "unsupported_grant_type" });
+      }
+    } catch (error: any) {
+      console.error("OAuth2 token error:", error);
+      res.status(500).json({ error: "server_error", error_description: "Token issuance failed" });
+    }
+  });
+
+  // OAuth2 UserInfo Endpoint
+  app.get("/oauth2/userinfo", async (req: Request, res: Response) => {
+    try {
+      const authHeader = req.headers.authorization;
+      if (!authHeader?.startsWith("Bearer ")) {
+        return res.status(401).json({ error: "invalid_token" });
+      }
+
+      const token = authHeader.substring(7);
+      const tokenHash = hashOAuth2Secret(token);
+
+      // Get and verify access token
+      const accessToken = await storage.getOAuth2AccessTokenByHash(tokenHash);
+      if (!accessToken) {
+        return res.status(401).json({ error: "invalid_token" });
+      }
+
+      // Get user info
+      const user = await storage.getUser(accessToken.userId);
+      if (!user) {
+        return res.status(404).json({ error: "user_not_found" });
+      }
+
+      // Return user info based on scopes
+      const userInfo: any = {
+        sub: user.id,
+      };
+
+      if (accessToken.scopes.includes("profile")) {
+        userInfo.name = `${user.firstName} ${user.lastName}`;
+        userInfo.given_name = user.firstName;
+        userInfo.family_name = user.lastName;
+      }
+
+      if (accessToken.scopes.includes("email")) {
+        userInfo.email = user.email;
+        userInfo.email_verified = user.emailVerified;
+      }
+
+      res.json(userInfo);
+    } catch (error: any) {
+      console.error("OAuth2 userinfo error:", error);
+      res.status(500).json({ error: "server_error" });
+    }
+  });
+
+  // JWKS Endpoint (JSON Web Key Set)
+  app.get("/.well-known/jwks.json", (req: Request, res: Response) => {
+    // TODO: Implement proper JWKS with RSA keys
+    // For now, return empty set (JWT validation will use shared secret)
+    res.json({
+      keys: []
+    });
+  });
+
+  // OpenID Connect Discovery Endpoint
+  app.get("/.well-known/openid-configuration", (req: Request, res: Response) => {
+    const baseUrl = `${req.protocol}://${req.get("host")}`;
+    
+    res.json({
+      issuer: baseUrl,
+      authorization_endpoint: `${baseUrl}/oauth2/authorize`,
+      token_endpoint: `${baseUrl}/oauth2/token`,
+      userinfo_endpoint: `${baseUrl}/oauth2/userinfo`,
+      jwks_uri: `${baseUrl}/.well-known/jwks.json`,
+      response_types_supported: ["code"],
+      subject_types_supported: ["public"],
+      id_token_signing_alg_values_supported: ["RS256", "HS256"],
+      scopes_supported: ["openid", "profile", "email"],
+      token_endpoint_auth_methods_supported: ["client_secret_post", "client_secret_basic"],
+      claims_supported: ["sub", "name", "given_name", "family_name", "email", "email_verified"],
+      code_challenge_methods_supported: ["S256", "plain"],
+      grant_types_supported: ["authorization_code", "refresh_token"],
+    });
   });
 
   return httpServer;
