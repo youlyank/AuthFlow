@@ -23,6 +23,7 @@ import TenantAdminUsers from "@/pages/TenantAdminUsers";
 import TenantAdminSessions from "@/pages/TenantAdminSessions";
 import TenantAdminSettings from "@/pages/TenantAdminSettings";
 import UserDashboard from "@/pages/UserDashboard";
+import SecuritySettings from "@/pages/SecuritySettings";
 
 function ProtectedRoute({ children, allowedRoles }: { children: React.ReactNode; allowedRoles?: string[] }) {
   const { user, isLoading } = useAuth();
@@ -147,6 +148,14 @@ function Router() {
         <ProtectedRoute>
           <DashboardLayout>
             <UserDashboard />
+          </DashboardLayout>
+        </ProtectedRoute>
+      </Route>
+
+      <Route path="/security">
+        <ProtectedRoute>
+          <DashboardLayout>
+            <SecuritySettings />
           </DashboardLayout>
         </ProtectedRoute>
       </Route>

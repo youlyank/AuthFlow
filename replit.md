@@ -101,6 +101,7 @@ Authflow is an enterprise-grade, multi-tenant authentication SaaS platform desig
 - `SESSION_SECRET` - Secret for session management
 
 **Optional (for features):**
+- `DEVICE_FINGERPRINT_SALT` - Salt for device fingerprinting (improves security across deployments)
 - `STRIPE_SECRET_KEY` - Stripe integration (deferred)
 - `VITE_STRIPE_PUBLIC_KEY` - Stripe public key (deferred)
 
@@ -175,6 +176,12 @@ Authflow is an enterprise-grade, multi-tenant authentication SaaS platform desig
 - ✅ Added WebSocket support for real-time notifications
 - ✅ Created test Super Admin account for testing
 - ✅ Configured dotenv for environment variable management
+- ✅ Implemented Email OTP MFA with trusted device support:
+  - Secure device fingerprinting using SHA-256 with salt
+  - 30-day trusted device expiry with automatic cleanup
+  - User Security Settings page for MFA management
+  - Trusted device listing and removal functionality
+  - Auto-invalidation of expired trusted devices
 
 ## Next Steps (Future Enhancements)
 - [ ] Stripe integration for subscription payments

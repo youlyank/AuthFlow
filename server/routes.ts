@@ -16,6 +16,22 @@ import { loginSchema, registerSchema, mfaVerifySchema, createNotificationSchema,
 import { emailService } from "./email";
 import speakeasy from "speakeasy";
 import QRCode from "qrcode";
+import { randomBytes, createHash } from "crypto";
+
+// Device fingerprinting with better security
+function generateDeviceFingerprint(userId: string, userAgent: string, ip: string): string {
+  // Create deterministic but secure fingerprint using configurable salt
+  const salt = process.env.DEVICE_FINGERPRINT_SALT || 'authflow-default-salt';
+  const data = `${userId}:${userAgent}:${ip}:${salt}`;
+  return createHash('sha256').update(data).digest('hex').substring(0, 64);
+}
+
+// Check if trusted device is expired (30 days default)
+function isTrustedDeviceExpired(lastSeenAt: Date | null, expiryDays: number = 30): boolean {
+  if (!lastSeenAt) return true;
+  const expiryMs = expiryDays * 24 * 60 * 60 * 1000;
+  return (Date.now() - lastSeenAt.getTime()) > expiryMs;
+}
 
 // Type augmentation for Express Request
 declare global {
@@ -1217,7 +1233,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Verify Email OTP and complete setup
   app.post("/api/user/mfa/email/verify", requireAuth, async (req: Request, res: Response) => {
     try {
-      const { code } = req.body;
+      const { code, rememberDevice } = req.body;
 
       if (!code) {
         return res.status(400).json({ error: "Code required" });
@@ -1238,7 +1254,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Delete used token
       await storage.deleteMfaOtpToken(req.user.id);
 
-      await auditLog(req, "mfa.enabled", "user", req.user.id, { method: "email" });
+      // Remember device if requested
+      if (rememberDevice) {
+        const userAgent = req.headers["user-agent"] || "Unknown";
+        const deviceFingerprint = generateDeviceFingerprint(req.user.id, userAgent, req.ip || "");
+        
+        await storage.createTrustedDevice({
+          userId: req.user.id,
+          fingerprint: deviceFingerprint,
+          deviceName: userAgent.substring(0, 100),
+          isTrusted: true,
+        });
+      }
+
+      await auditLog(req, "mfa.enabled", "user", req.user.id, { method: "email", rememberDevice });
 
       res.json({ message: "Email OTP enabled successfully" });
     } catch (error: any) {
@@ -1247,12 +1276,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Send Email OTP code
+  // Send Email OTP code (checks trusted devices first)
   app.post("/api/user/mfa/email/send", requireAuth, async (req: Request, res: Response) => {
     try {
       const user = await storage.getUser(req.user.id);
       if (!user) {
         return res.status(404).json({ error: "User not found" });
+      }
+
+      // Check if device is trusted and not expired
+      const userAgent = req.headers["user-agent"] || "Unknown";
+      const deviceFingerprint = generateDeviceFingerprint(req.user.id, userAgent, req.ip || "");
+      const trustedDevice = await storage.getTrustedDevice(req.user.id, deviceFingerprint);
+
+      if (trustedDevice && trustedDevice.isTrusted) {
+        // Check if device trust is expired (30 days)
+        if (isTrustedDeviceExpired(trustedDevice.lastSeenAt)) {
+          // Trust expired, require new OTP
+          await storage.deleteTrustedDevice(trustedDevice.id);
+        } else {
+          // Update last seen and skip OTP for trusted device
+          await storage.updateTrustedDeviceLastSeen(req.user.id, deviceFingerprint);
+          return res.json({ message: "Trusted device - OTP not required", trusted: true });
+        }
       }
 
       // Generate OTP code
@@ -1273,7 +1319,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Send OTP code via email
       await emailService.sendMFACode(user.email, code);
 
-      res.json({ message: "OTP sent to your email" });
+      res.json({ message: "OTP sent to your email", trusted: false });
     } catch (error: any) {
       console.error("Error sending email OTP:", error);
       res.status(500).json({ error: "Failed to send email OTP" });
@@ -1308,6 +1354,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Delete any pending OTP tokens
       await storage.deleteMfaOtpToken(req.user.id);
+      
+      // Remove all trusted devices for this user
+      const trustedDevices = await storage.listTrustedDevices(req.user.id);
+      for (const device of trustedDevices) {
+        await storage.deleteTrustedDevice(device.id);
+      }
 
       await auditLog(req, "mfa.disabled", "user", req.user.id, {});
 
@@ -1315,6 +1367,42 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error: any) {
       console.error("Error disabling email OTP:", error);
       res.status(500).json({ error: "Failed to disable email OTP" });
+    }
+  });
+
+  // ===== Trusted Devices Routes =====
+
+  // List user's trusted devices
+  app.get("/api/user/trusted-devices", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const devices = await storage.listTrustedDevices(req.user.id);
+      res.json(devices);
+    } catch (error: any) {
+      console.error("Error fetching trusted devices:", error);
+      res.status(500).json({ error: "Failed to fetch trusted devices" });
+    }
+  });
+
+  // Remove a trusted device
+  app.delete("/api/user/trusted-devices/:id", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const { id } = req.params;
+      
+      // Verify the device belongs to the user
+      const devices = await storage.listTrustedDevices(req.user.id);
+      const device = devices.find(d => d.id === id);
+      
+      if (!device) {
+        return res.status(404).json({ error: "Device not found" });
+      }
+      
+      await storage.deleteTrustedDevice(id);
+      await auditLog(req, "trusted_device.removed", "user", req.user.id, { deviceId: id });
+      
+      res.json({ message: "Trusted device removed successfully" });
+    } catch (error: any) {
+      console.error("Error removing trusted device:", error);
+      res.status(500).json({ error: "Failed to remove trusted device" });
     }
   });
 

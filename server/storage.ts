@@ -69,6 +69,13 @@ export interface IStorage {
   createMfaOtpToken(token: any): Promise<any>;
   getMfaOtpToken(userId: string, code: string): Promise<any>;
   deleteMfaOtpToken(userId: string): Promise<void>;
+  
+  // Trusted device operations
+  createTrustedDevice(device: any): Promise<any>;
+  getTrustedDevice(userId: string, fingerprint: string): Promise<any>;
+  updateTrustedDeviceLastSeen(userId: string, fingerprint: string): Promise<void>;
+  listTrustedDevices(userId: string): Promise<any[]>;
+  deleteTrustedDevice(id: string): Promise<void>;
 
   // Tenant operations
   getTenant(id: string): Promise<Tenant | undefined>;
@@ -557,6 +564,69 @@ export class DbStorage implements IStorage {
 
   async deleteMfaOtpToken(userId: string): Promise<void> {
     await db.delete(mfaOtpTokens).where(eq(mfaOtpTokens.userId, userId));
+  }
+
+  async createTrustedDevice(device: any): Promise<any> {
+    // Check for existing device with same fingerprint
+    const existing = await this.getTrustedDevice(device.userId, device.fingerprint);
+    
+    if (existing) {
+      // Update existing device instead of creating duplicate
+      const [updated] = await db
+        .update(trustedDevices)
+        .set({ 
+          isTrusted: device.isTrusted,
+          deviceName: device.deviceName,
+          lastSeenAt: new Date(),
+        })
+        .where(eq(trustedDevices.id, existing.id))
+        .returning();
+      return updated;
+    }
+    
+    // Set timestamps for new device
+    const now = new Date();
+    const [newDevice] = await db.insert(trustedDevices).values({
+      ...device,
+      createdAt: now,
+      lastSeenAt: now,
+    }).returning();
+    return newDevice;
+  }
+
+  async getTrustedDevice(userId: string, fingerprint: string): Promise<any> {
+    const [device] = await db
+      .select()
+      .from(trustedDevices)
+      .where(and(
+        eq(trustedDevices.userId, userId),
+        eq(trustedDevices.fingerprint, fingerprint),
+        eq(trustedDevices.isTrusted, true)
+      ))
+      .limit(1);
+    return device;
+  }
+  
+  async updateTrustedDeviceLastSeen(userId: string, fingerprint: string): Promise<void> {
+    await db
+      .update(trustedDevices)
+      .set({ lastSeenAt: new Date() })
+      .where(and(
+        eq(trustedDevices.userId, userId),
+        eq(trustedDevices.fingerprint, fingerprint)
+      ));
+  }
+
+  async listTrustedDevices(userId: string): Promise<any[]> {
+    return db
+      .select()
+      .from(trustedDevices)
+      .where(eq(trustedDevices.userId, userId))
+      .orderBy(desc(trustedDevices.lastSeenAt));
+  }
+
+  async deleteTrustedDevice(id: string): Promise<void> {
+    await db.delete(trustedDevices).where(eq(trustedDevices.id, id));
   }
 }
 
