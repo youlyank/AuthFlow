@@ -1,11 +1,13 @@
 import "dotenv/config";
 import express, { type Request, Response, NextFunction } from "express";
+import cookieParser from "cookie-parser";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 import { startWebhookScheduler } from "./webhooks";
 import { startOAuth2CleanupScheduler } from "./oauth2-cleanup";
 
 const app = express();
+app.use(cookieParser());
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 
