@@ -1,6 +1,6 @@
 import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import {
   Shield,
@@ -10,47 +10,158 @@ import {
   Lock,
   Zap,
   BarChart3,
-  Webhook,
-  Mail,
-  Bell,
-  Palette,
-  FileText,
+  ArrowRight,
   CheckCircle2,
-  Eye,
   Fingerprint,
-  ShieldAlert,
-  MapPin,
-  Database,
-  Settings,
-  Activity,
+  ShieldCheck,
   Cloud,
   Code,
   Sparkles,
+  DollarSign,
+  TrendingUp,
+  Server,
+  Webhook,
+  Database,
+  Settings,
+  FileCode,
+  Layers,
 } from "lucide-react";
 
 export default function LandingPage() {
+  const stats = [
+    { value: "99.9%", label: "Uptime SLA" },
+    { value: "27+", label: "Enterprise Features" },
+    { value: "80%", label: "Cost Savings" },
+    { value: "< 10ms", label: "Response Time" },
+  ];
+
+  const authMethods = [
+    {
+      icon: Key,
+      title: "Email & Password",
+      description: "Secure authentication with bcrypt hashing, email verification, and password reset flows.",
+    },
+    {
+      icon: ShieldCheck,
+      title: "Multi-Factor Auth",
+      description: "TOTP authenticators, email OTP, and trusted device fingerprinting for enhanced security.",
+    },
+    {
+      icon: Zap,
+      title: "Magic Links",
+      description: "Passwordless authentication via secure, time-limited email links.",
+    },
+    {
+      icon: Fingerprint,
+      title: "WebAuthn/FIDO2",
+      description: "Biometric authentication with Touch ID, Face ID, and hardware security keys.",
+    },
+    {
+      icon: Globe,
+      title: "Social Login",
+      description: "OAuth integration with Google, GitHub, and other popular providers.",
+    },
+    {
+      icon: Shield,
+      title: "Risk-Based Auth",
+      description: "Intelligent security scoring with automatic threat detection and mitigation.",
+    },
+  ];
+
+  const enterpriseFeatures = [
+    {
+      icon: Users,
+      title: "Multi-Tenancy",
+      description: "Complete tenant isolation with per-tenant branding and unlimited organizations.",
+      badge: "Enterprise",
+    },
+    {
+      icon: Lock,
+      title: "OAuth2/OIDC Provider",
+      description: "Full OAuth2 authorization server with PKCE, consent screens, and token management.",
+      badge: "Standards",
+    },
+    {
+      icon: Webhook,
+      title: "Webhooks & APIs",
+      description: "Comprehensive REST APIs and webhooks for seamless integration with your systems.",
+      badge: "Developer",
+    },
+    {
+      icon: BarChart3,
+      title: "Advanced Analytics",
+      description: "Real-time dashboards, security events, and user growth metrics for data-driven decisions.",
+      badge: "Insights",
+    },
+    {
+      icon: Database,
+      title: "GDPR Compliance",
+      description: "Built-in data export, right-to-be-forgotten, and consent management tools.",
+      badge: "Compliance",
+    },
+    {
+      icon: ShieldCheck,
+      title: "Breach Detection",
+      description: "Password breach monitoring using Have I Been Pwned API with k-anonymity.",
+      badge: "Security",
+    },
+  ];
+
+  const deploymentOptions = [
+    {
+      title: "Cloud-Hosted",
+      description: "Fully managed, scalable infrastructure with automatic updates and 99.9% uptime SLA.",
+      features: ["Automatic scaling", "Global CDN", "Managed backups", "24/7 monitoring"],
+      icon: Cloud,
+      recommended: true,
+    },
+    {
+      title: "Self-Hosted",
+      description: "Deploy on your infrastructure for complete control and data sovereignty.",
+      features: ["Full source access", "Custom deployment", "Data sovereignty", "No vendor lock-in"],
+      icon: Server,
+      recommended: false,
+    },
+  ];
+
+  const comparisons = [
+    { metric: "Base Price", authflow: "$99/mo", auth0: "$240/mo", okta: "$2,400/mo" },
+    { metric: "Per-User Cost", authflow: "$0", auth0: "$0.05-0.15", okta: "$2-5" },
+    { metric: "Multi-Tenancy", authflow: "Included", auth0: "Paid Add-on", okta: "Enterprise Only" },
+    { metric: "Self-Hosting", authflow: "Available", auth0: "Not Available", okta: "Not Available" },
+  ];
+
   return (
     <div className="min-h-screen bg-background">
       {/* Navigation */}
       <nav className="border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 sticky top-0 z-50">
-        <div className="container mx-auto px-4 py-4">
-          <div className="flex items-center justify-between">
+        <div className="container mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex items-center justify-between h-16">
             <div className="flex items-center gap-2">
               <Shield className="h-8 w-8 text-primary" />
               <span className="text-2xl font-bold">Authflow</span>
             </div>
-            <div className="flex items-center gap-4">
+            <div className="hidden md:flex items-center gap-6">
               <Link href="/comparison">
-                <Button variant="ghost" data-testid="link-comparison">Compare</Button>
+                <Button variant="ghost" size="sm" data-testid="link-comparison">
+                  Compare
+                </Button>
               </Link>
               <Link href="/why-authflow">
-                <Button variant="ghost" data-testid="link-why-authflow">Why Us</Button>
+                <Button variant="ghost" size="sm" data-testid="link-why-authflow">
+                  Why Us
+                </Button>
               </Link>
               <Link href="/login">
-                <Button variant="ghost" data-testid="button-login">Login</Button>
+                <Button variant="ghost" size="sm" data-testid="button-login">
+                  Login
+                </Button>
               </Link>
               <Link href="/register">
-                <Button data-testid="button-get-started">Get Started</Button>
+                <Button size="sm" className="gap-2" data-testid="button-get-started">
+                  Get Started
+                  <ArrowRight className="h-4 w-4" />
+                </Button>
               </Link>
             </div>
           </div>
@@ -58,927 +169,473 @@ export default function LandingPage() {
       </nav>
 
       {/* Hero Section */}
-      <section className="py-20 px-4">
-        <div className="container mx-auto text-center">
-          <Badge className="mb-4" variant="secondary">
-            <Sparkles className="h-3 w-3 mr-1" />
-            22 Enterprise Features • Production Ready
-          </Badge>
-          <h1 className="text-5xl md:text-6xl font-bold mb-6 bg-gradient-to-r from-primary to-blue-600 bg-clip-text text-transparent">
-            Replace Auth0 at 80% Lower Cost
-          </h1>
-          <p className="text-xl text-muted-foreground mb-8 max-w-3xl mx-auto">
-            Enterprise-grade B2B authentication platform. Everything Auth0 does, for 20% of the price, 
-            with the option to self-host. Deploy in minutes, scale to millions.
+      <section className="relative overflow-hidden py-20 sm:py-28 lg:py-32 px-4 sm:px-6 lg:px-8">
+        <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-background to-blue-500/5 pointer-events-none" />
+        <div className="container mx-auto relative">
+          <div className="max-w-4xl mx-auto text-center">
+            <Badge className="mb-6 gap-1.5" variant="secondary">
+              <Sparkles className="h-3.5 w-3.5" />
+              Enterprise Authentication Platform
+            </Badge>
+            <h1 className="text-4xl sm:text-5xl lg:text-7xl font-bold tracking-tight mb-6">
+              Authentication that{" "}
+              <span className="bg-gradient-to-r from-primary via-blue-600 to-primary bg-clip-text text-transparent">
+                scales with you
+              </span>
+            </h1>
+            <p className="text-lg sm:text-xl text-muted-foreground mb-10 max-w-3xl mx-auto leading-relaxed">
+              Replace Auth0 and Okta with a modern, cost-effective authentication platform.
+              27+ enterprise features, 80% cost savings, flexible deployment options.
+            </p>
+            <div className="flex gap-4 justify-center flex-wrap mb-12">
+              <Link href="/register">
+                <Button size="lg" className="gap-2 h-12 px-8" data-testid="button-start-free-trial">
+                  Start Free Trial
+                  <ArrowRight className="h-5 w-5" />
+                </Button>
+              </Link>
+              <Link href="/comparison">
+                <Button size="lg" variant="outline" className="gap-2 h-12 px-8" data-testid="button-compare-plans">
+                  Compare Plans
+                  <BarChart3 className="h-5 w-5" />
+                </Button>
+              </Link>
+            </div>
+
+            {/* Stats */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-6 sm:gap-8 max-w-4xl mx-auto pt-8 border-t">
+              {stats.map((stat, idx) => (
+                <div key={idx} className="text-center">
+                  <div className="text-3xl sm:text-4xl font-bold text-primary mb-1">
+                    {stat.value}
+                  </div>
+                  <div className="text-sm text-muted-foreground">{stat.label}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Trust Indicators */}
+      <section className="py-12 px-4 sm:px-6 lg:px-8 bg-muted/30 border-y">
+        <div className="container mx-auto">
+          <p className="text-center text-sm text-muted-foreground mb-8">
+            TRUSTED BY INNOVATIVE COMPANIES WORLDWIDE
           </p>
-          <div className="flex gap-4 justify-center flex-wrap">
+          <div className="flex justify-center items-center gap-8 flex-wrap opacity-50">
+            <div className="text-2xl font-bold">TechCorp</div>
+            <div className="text-2xl font-bold">StartupXYZ</div>
+            <div className="text-2xl font-bold">Enterprise Co</div>
+            <div className="text-2xl font-bold">SaaS Platform</div>
+          </div>
+        </div>
+      </section>
+
+      {/* Authentication Methods */}
+      <section className="py-20 sm:py-24 px-4 sm:px-6 lg:px-8">
+        <div className="container mx-auto">
+          <div className="text-center mb-16">
+            <Badge className="mb-4">Authentication</Badge>
+            <h2 className="text-3xl sm:text-4xl lg:text-5xl font-bold mb-4">
+              Every Authentication Method
+            </h2>
+            <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
+              From traditional passwords to cutting-edge biometrics, support all modern
+              authentication methods out of the box.
+            </p>
+          </div>
+
+          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6 max-w-6xl mx-auto">
+            {authMethods.map((method, idx) => {
+              const Icon = method.icon;
+              return (
+                <Card key={idx} className="hover-elevate" data-testid={`card-auth-${idx}`}>
+                  <CardHeader>
+                    <div className="mb-4 p-3 rounded-lg bg-primary/10 w-fit">
+                      <Icon className="h-6 w-6 text-primary" />
+                    </div>
+                    <CardTitle className="text-xl">{method.title}</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <p className="text-sm text-muted-foreground leading-relaxed">
+                      {method.description}
+                    </p>
+                  </CardContent>
+                </Card>
+              );
+            })}
+          </div>
+        </div>
+      </section>
+
+      {/* Enterprise Features */}
+      <section className="py-20 sm:py-24 px-4 sm:px-6 lg:px-8 bg-muted/30">
+        <div className="container mx-auto">
+          <div className="text-center mb-16">
+            <Badge className="mb-4">Enterprise Ready</Badge>
+            <h2 className="text-3xl sm:text-4xl lg:text-5xl font-bold mb-4">
+              Built for Modern Businesses
+            </h2>
+            <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
+              Everything you need to build secure, scalable authentication for B2B SaaS,
+              fintech, healthcare, and more.
+            </p>
+          </div>
+
+          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6 max-w-6xl mx-auto">
+            {enterpriseFeatures.map((feature, idx) => {
+              const Icon = feature.icon;
+              return (
+                <Card key={idx} className="hover-elevate">
+                  <CardHeader>
+                    <div className="flex items-start justify-between mb-4">
+                      <div className="p-3 rounded-lg bg-primary/10">
+                        <Icon className="h-6 w-6 text-primary" />
+                      </div>
+                      <Badge variant="secondary" className="text-xs">
+                        {feature.badge}
+                      </Badge>
+                    </div>
+                    <CardTitle className="text-xl">{feature.title}</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <p className="text-sm text-muted-foreground leading-relaxed">
+                      {feature.description}
+                    </p>
+                  </CardContent>
+                </Card>
+              );
+            })}
+          </div>
+        </div>
+      </section>
+
+      {/* Deployment Options */}
+      <section className="py-20 sm:py-24 px-4 sm:px-6 lg:px-8">
+        <div className="container mx-auto">
+          <div className="text-center mb-16">
+            <Badge className="mb-4">Flexible Deployment</Badge>
+            <h2 className="text-3xl sm:text-4xl lg:text-5xl font-bold mb-4">
+              Deploy Your Way
+            </h2>
+            <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
+              Choose cloud-hosted for convenience or self-host for complete control. The only
+              auth platform offering both.
+            </p>
+          </div>
+
+          <div className="grid md:grid-cols-2 gap-8 max-w-5xl mx-auto">
+            {deploymentOptions.map((option, idx) => {
+              const Icon = option.icon;
+              return (
+                <Card
+                  key={idx}
+                  className={`hover-elevate ${
+                    option.recommended ? "border-2 border-primary shadow-lg" : ""
+                  }`}
+                >
+                  <CardHeader>
+                    {option.recommended && (
+                      <Badge className="mb-3 w-fit">Recommended</Badge>
+                    )}
+                    <div className="p-4 rounded-lg bg-primary/10 w-fit mb-4">
+                      <Icon className="h-8 w-8 text-primary" />
+                    </div>
+                    <CardTitle className="text-2xl mb-2">{option.title}</CardTitle>
+                    <p className="text-muted-foreground">{option.description}</p>
+                  </CardHeader>
+                  <CardContent>
+                    <ul className="space-y-3">
+                      {option.features.map((feature, i) => (
+                        <li key={i} className="flex items-center gap-2 text-sm">
+                          <CheckCircle2 className="h-4 w-4 text-primary flex-shrink-0" />
+                          <span>{feature}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </CardContent>
+                </Card>
+              );
+            })}
+          </div>
+        </div>
+      </section>
+
+      {/* Pricing Comparison */}
+      <section className="py-20 sm:py-24 px-4 sm:px-6 lg:px-8 bg-gradient-to-br from-primary/5 to-background">
+        <div className="container mx-auto">
+          <div className="text-center mb-16">
+            <Badge className="mb-4 gap-1.5">
+              <DollarSign className="h-3.5 w-3.5" />
+              Pricing
+            </Badge>
+            <h2 className="text-3xl sm:text-4xl lg:text-5xl font-bold mb-4">
+              80% Lower Cost Than Auth0
+            </h2>
+            <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
+              Get all enterprise features at a fraction of the cost. No per-user fees, no hidden
+              charges.
+            </p>
+          </div>
+
+          <div className="max-w-4xl mx-auto">
+            <Card className="overflow-hidden">
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead className="bg-muted/50">
+                    <tr>
+                      <th className="text-left py-4 px-6 font-semibold">Feature</th>
+                      <th className="text-center py-4 px-6 font-semibold text-primary">
+                        Authflow
+                      </th>
+                      <th className="text-center py-4 px-6 font-semibold">Auth0</th>
+                      <th className="text-center py-4 px-6 font-semibold">Okta</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {comparisons.map((row, idx) => (
+                      <tr key={idx} className="border-t hover-elevate">
+                        <td className="py-4 px-6 font-medium">{row.metric}</td>
+                        <td className="py-4 px-6 text-center">
+                          <span className="inline-flex items-center gap-1.5 font-semibold text-green-600">
+                            <CheckCircle2 className="h-4 w-4" />
+                            {row.authflow}
+                          </span>
+                        </td>
+                        <td className="py-4 px-6 text-center text-muted-foreground">
+                          {row.auth0}
+                        </td>
+                        <td className="py-4 px-6 text-center text-muted-foreground">
+                          {row.okta}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </Card>
+
+            <div className="mt-8 text-center">
+              <p className="text-sm text-muted-foreground mb-4">
+                Example: For 10,000 users/month
+              </p>
+              <div className="flex gap-4 justify-center items-center flex-wrap">
+                <div className="text-lg">
+                  <span className="text-muted-foreground">Authflow: </span>
+                  <span className="font-bold text-green-600">$99-299/mo</span>
+                </div>
+                <div className="text-lg">
+                  <span className="text-muted-foreground">Auth0: </span>
+                  <span className="font-bold text-red-500">$5,000+/mo</span>
+                </div>
+              </div>
+              <p className="mt-4 text-2xl font-bold text-green-600">
+                💰 Save over $50,000 per year
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Developer Experience */}
+      <section className="py-20 sm:py-24 px-4 sm:px-6 lg:px-8 bg-muted/30">
+        <div className="container mx-auto">
+          <div className="max-w-5xl mx-auto">
+            <div className="grid md:grid-cols-2 gap-12 items-center">
+              <div>
+                <Badge className="mb-4">Developer First</Badge>
+                <h2 className="text-3xl sm:text-4xl font-bold mb-6">
+                  Built by Developers, for Developers
+                </h2>
+                <p className="text-lg text-muted-foreground mb-8">
+                  Modern tech stack, comprehensive APIs, and detailed documentation make
+                  integration a breeze.
+                </p>
+                <ul className="space-y-4">
+                  <li className="flex items-start gap-3">
+                    <div className="p-2 rounded-lg bg-primary/10 mt-1">
+                      <Code className="h-5 w-5 text-primary" />
+                    </div>
+                    <div>
+                      <div className="font-semibold mb-1">RESTful APIs</div>
+                      <div className="text-sm text-muted-foreground">
+                        100+ well-documented endpoints with OpenAPI specs
+                      </div>
+                    </div>
+                  </li>
+                  <li className="flex items-start gap-3">
+                    <div className="p-2 rounded-lg bg-primary/10 mt-1">
+                      <Webhook className="h-5 w-5 text-primary" />
+                    </div>
+                    <div>
+                      <div className="font-semibold mb-1">Webhooks</div>
+                      <div className="text-sm text-muted-foreground">
+                        Real-time event notifications with automatic retries
+                      </div>
+                    </div>
+                  </li>
+                  <li className="flex items-start gap-3">
+                    <div className="p-2 rounded-lg bg-primary/10 mt-1">
+                      <FileCode className="h-5 w-5 text-primary" />
+                    </div>
+                    <div>
+                      <div className="font-semibold mb-1">SDKs Coming Soon</div>
+                      <div className="text-sm text-muted-foreground">
+                        JavaScript, Python, Go, and PHP client libraries
+                      </div>
+                    </div>
+                  </li>
+                </ul>
+              </div>
+              <div className="relative">
+                <div className="bg-card border rounded-lg p-6 shadow-lg">
+                  <div className="flex items-center gap-2 mb-4">
+                    <div className="flex gap-1.5">
+                      <div className="h-3 w-3 rounded-full bg-red-500" />
+                      <div className="h-3 w-3 rounded-full bg-yellow-500" />
+                      <div className="h-3 w-3 rounded-full bg-green-500" />
+                    </div>
+                    <span className="text-xs text-muted-foreground ml-2">Quick Start</span>
+                  </div>
+                  <pre className="text-sm font-mono bg-muted p-4 rounded overflow-x-auto">
+                    <code className="text-foreground">{`// Initialize Authflow
+import { Authflow } from 'authflow';
+
+const auth = new Authflow({
+  tenantId: 'your-tenant-id',
+  apiKey: 'your-api-key'
+});
+
+// Authenticate user
+const user = await auth.login({
+  email: 'user@example.com',
+  password: 'secure-password'
+});`}</code>
+                  </pre>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Final CTA */}
+      <section className="py-20 sm:py-28 px-4 sm:px-6 lg:px-8 bg-primary text-primary-foreground relative overflow-hidden">
+        <div className="absolute inset-0 bg-gradient-to-br from-blue-600/20 to-transparent pointer-events-none" />
+        <div className="container mx-auto text-center relative">
+          <h2 className="text-3xl sm:text-4xl lg:text-5xl font-bold mb-6">
+            Ready to Transform Your Authentication?
+          </h2>
+          <p className="text-lg sm:text-xl opacity-90 mb-10 max-w-2xl mx-auto">
+            Join innovative companies using Authflow. Start your free trial today—no credit card
+            required.
+          </p>
+          <div className="flex gap-4 justify-center flex-wrap mb-8">
             <Link href="/register">
-              <Button size="lg" className="gap-2" data-testid="button-start-free">
-                <Zap className="h-5 w-5" />
+              <Button
+                size="lg"
+                variant="secondary"
+                className="gap-2 h-12 px-8"
+                data-testid="button-cta-start"
+              >
+                <Sparkles className="h-5 w-5" />
                 Start Free Trial
               </Button>
             </Link>
-            <Button size="lg" variant="outline" className="gap-2" data-testid="button-view-docs">
-              <Code className="h-5 w-5" />
-              View Documentation
-            </Button>
-          </div>
-          <div className="mt-12 grid grid-cols-2 md:grid-cols-4 gap-8 max-w-4xl mx-auto">
-            <div>
-              <div className="text-3xl font-bold text-primary">100+</div>
-              <div className="text-sm text-muted-foreground">API Endpoints</div>
-            </div>
-            <div>
-              <div className="text-3xl font-bold text-primary">22</div>
-              <div className="text-sm text-muted-foreground">Enterprise Features</div>
-            </div>
-            <div>
-              <div className="text-3xl font-bold text-primary">99.9%</div>
-              <div className="text-sm text-muted-foreground">Uptime SLA</div>
-            </div>
-            <div>
-              <div className="text-3xl font-bold text-primary">80%</div>
-              <div className="text-sm text-muted-foreground">Cost Savings</div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* Core Authentication Features */}
-      <section className="py-20 px-4 bg-muted/30">
-        <div className="container mx-auto">
-          <div className="text-center mb-12">
-            <Badge className="mb-4">Core Authentication</Badge>
-            <h2 className="text-4xl font-bold mb-4">Every Authentication Method You Need</h2>
-            <p className="text-muted-foreground max-w-2xl mx-auto">
-              5 authentication methods built-in, from traditional passwords to cutting-edge biometrics
-            </p>
-          </div>
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-            <Card data-testid="card-email-auth">
-              <CardHeader>
-                <Mail className="h-10 w-10 text-primary mb-2" />
-                <CardTitle>Email/Password</CardTitle>
-                <CardDescription>Traditional authentication with modern security</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <ul className="space-y-2 text-sm">
-                  <li className="flex items-center gap-2">
-                    <CheckCircle2 className="h-4 w-4 text-primary" />
-                    Bcrypt hashing (10 rounds)
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <CheckCircle2 className="h-4 w-4 text-primary" />
-                    Email verification
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <CheckCircle2 className="h-4 w-4 text-primary" />
-                    Password reset flow
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <CheckCircle2 className="h-4 w-4 text-primary" />
-                    Secure token generation
-                  </li>
-                </ul>
-              </CardContent>
-            </Card>
-
-            <Card data-testid="card-mfa">
-              <CardHeader>
-                <ShieldAlert className="h-10 w-10 text-primary mb-2" />
-                <CardTitle>Multi-Factor Auth (MFA)</CardTitle>
-                <CardDescription>TOTP, Email OTP, Trusted Devices</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <ul className="space-y-2 text-sm">
-                  <li className="flex items-center gap-2">
-                    <CheckCircle2 className="h-4 w-4 text-primary" />
-                    Authenticator apps (TOTP)
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <CheckCircle2 className="h-4 w-4 text-primary" />
-                    Email OTP codes
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <CheckCircle2 className="h-4 w-4 text-primary" />
-                    Trusted device fingerprinting
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <CheckCircle2 className="h-4 w-4 text-primary" />
-                    QR code generation
-                  </li>
-                </ul>
-              </CardContent>
-            </Card>
-
-            <Card data-testid="card-magic-link">
-              <CardHeader>
-                <Zap className="h-10 w-10 text-primary mb-2" />
-                <CardTitle>Magic Link</CardTitle>
-                <CardDescription>Passwordless authentication via email</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <ul className="space-y-2 text-sm">
-                  <li className="flex items-center gap-2">
-                    <CheckCircle2 className="h-4 w-4 text-primary" />
-                    One-click email login
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <CheckCircle2 className="h-4 w-4 text-primary" />
-                    15-minute expiry
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <CheckCircle2 className="h-4 w-4 text-primary" />
-                    Tenant-scoped security
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <CheckCircle2 className="h-4 w-4 text-primary" />
-                    One-time use tokens
-                  </li>
-                </ul>
-              </CardContent>
-            </Card>
-
-            <Card data-testid="card-webauthn">
-              <CardHeader>
-                <Fingerprint className="h-10 w-10 text-primary mb-2" />
-                <CardTitle>WebAuthn/FIDO2</CardTitle>
-                <CardDescription>Biometric & hardware key authentication</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <ul className="space-y-2 text-sm">
-                  <li className="flex items-center gap-2">
-                    <CheckCircle2 className="h-4 w-4 text-primary" />
-                    Touch ID, Face ID
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <CheckCircle2 className="h-4 w-4 text-primary" />
-                    YubiKey support
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <CheckCircle2 className="h-4 w-4 text-primary" />
-                    FIDO2 compliant
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <CheckCircle2 className="h-4 w-4 text-primary" />
-                    Multiple credentials
-                  </li>
-                </ul>
-              </CardContent>
-            </Card>
-
-            <Card data-testid="card-sessions">
-              <CardHeader>
-                <Activity className="h-10 w-10 text-primary mb-2" />
-                <CardTitle>Session Management</CardTitle>
-                <CardDescription>Advanced session tracking & control</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <ul className="space-y-2 text-sm">
-                  <li className="flex items-center gap-2">
-                    <CheckCircle2 className="h-4 w-4 text-primary" />
-                    JWT-based sessions
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <CheckCircle2 className="h-4 w-4 text-primary" />
-                    Device tracking
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <CheckCircle2 className="h-4 w-4 text-primary" />
-                    Session revocation
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <CheckCircle2 className="h-4 w-4 text-primary" />
-                    Refresh tokens (30-day)
-                  </li>
-                </ul>
-              </CardContent>
-            </Card>
-          </div>
-        </div>
-      </section>
-
-      {/* Security Features */}
-      <section className="py-20 px-4">
-        <div className="container mx-auto">
-          <div className="text-center mb-12">
-            <Badge className="mb-4">Advanced Security</Badge>
-            <h2 className="text-4xl font-bold mb-4">Enterprise-Grade Security</h2>
-            <p className="text-muted-foreground max-w-2xl mx-auto">
-              Comprehensive security features that protect your users and meet compliance requirements
-            </p>
-          </div>
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-            <Card data-testid="card-breach-detection">
-              <CardHeader>
-                <ShieldAlert className="h-10 w-10 text-primary mb-2" />
-                <CardTitle>Password Breach Detection</CardTitle>
-                <CardDescription>Have I Been Pwned integration</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <ul className="space-y-2 text-sm">
-                  <li className="flex items-center gap-2">
-                    <CheckCircle2 className="h-4 w-4 text-primary" />
-                    k-anonymity model
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <CheckCircle2 className="h-4 w-4 text-primary" />
-                    Real-time checking
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <CheckCircle2 className="h-4 w-4 text-primary" />
-                    Privacy-preserving
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <CheckCircle2 className="h-4 w-4 text-primary" />
-                    No plaintext transmission
-                  </li>
-                </ul>
-              </CardContent>
-            </Card>
-
-            <Card data-testid="card-risk-scoring">
-              <CardHeader>
-                <Eye className="h-10 w-10 text-primary mb-2" />
-                <CardTitle>Security Events & Risk Scoring</CardTitle>
-                <CardDescription>Real-time threat detection (0-100 scale)</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <ul className="space-y-2 text-sm">
-                  <li className="flex items-center gap-2">
-                    <CheckCircle2 className="h-4 w-4 text-primary" />
-                    Suspicious login detection
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <CheckCircle2 className="h-4 w-4 text-primary" />
-                    Unusual location tracking
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <CheckCircle2 className="h-4 w-4 text-primary" />
-                    Multiple failure alerts
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <CheckCircle2 className="h-4 w-4 text-primary" />
-                    Velocity checks
-                  </li>
-                </ul>
-              </CardContent>
-            </Card>
-
-            <Card data-testid="card-ip-restrictions">
-              <CardHeader>
-                <MapPin className="h-10 w-10 text-primary mb-2" />
-                <CardTitle>IP Restrictions</CardTitle>
-                <CardDescription>Geographic & CIDR-based access control</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <ul className="space-y-2 text-sm">
-                  <li className="flex items-center gap-2">
-                    <CheckCircle2 className="h-4 w-4 text-primary" />
-                    Geographic blocking
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <CheckCircle2 className="h-4 w-4 text-primary" />
-                    IP whitelist (CIDR)
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <CheckCircle2 className="h-4 w-4 text-primary" />
-                    IP blacklist (CIDR)
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <CheckCircle2 className="h-4 w-4 text-primary" />
-                    Per-tenant rules
-                  </li>
-                </ul>
-              </CardContent>
-            </Card>
-
-            <Card data-testid="card-audit-logs">
-              <CardHeader>
-                <FileText className="h-10 w-10 text-primary mb-2" />
-                <CardTitle>Audit Logging</CardTitle>
-                <CardDescription>Comprehensive compliance tracking</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <ul className="space-y-2 text-sm">
-                  <li className="flex items-center gap-2">
-                    <CheckCircle2 className="h-4 w-4 text-primary" />
-                    All actions tracked
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <CheckCircle2 className="h-4 w-4 text-primary" />
-                    IP & user agent logging
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <CheckCircle2 className="h-4 w-4 text-primary" />
-                    Change tracking
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <CheckCircle2 className="h-4 w-4 text-primary" />
-                    Tenant-scoped
-                  </li>
-                </ul>
-              </CardContent>
-            </Card>
-
-            <Card data-testid="card-gdpr">
-              <CardHeader>
-                <Database className="h-10 w-10 text-primary mb-2" />
-                <CardTitle>GDPR Compliance</CardTitle>
-                <CardDescription>Data privacy & user rights</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <ul className="space-y-2 text-sm">
-                  <li className="flex items-center gap-2">
-                    <CheckCircle2 className="h-4 w-4 text-primary" />
-                    Data export requests
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <CheckCircle2 className="h-4 w-4 text-primary" />
-                    Right to be forgotten
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <CheckCircle2 className="h-4 w-4 text-primary" />
-                    Request tracking
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <CheckCircle2 className="h-4 w-4 text-primary" />
-                    30-day processing
-                  </li>
-                </ul>
-              </CardContent>
-            </Card>
-          </div>
-        </div>
-      </section>
-
-      {/* Multi-Tenant Architecture */}
-      <section className="py-20 px-4 bg-muted/30">
-        <div className="container mx-auto">
-          <div className="text-center mb-12">
-            <Badge className="mb-4">Multi-Tenant Platform</Badge>
-            <h2 className="text-4xl font-bold mb-4">Built for B2B SaaS</h2>
-            <p className="text-muted-foreground max-w-2xl mx-auto">
-              Complete tenant isolation with enterprise-grade access control
-            </p>
-          </div>
-          <div className="grid md:grid-cols-2 gap-6">
-            <Card data-testid="card-tenant-isolation">
-              <CardHeader>
-                <Lock className="h-10 w-10 text-primary mb-2" />
-                <CardTitle>Complete Tenant Isolation</CardTitle>
-                <CardDescription>Security audit passed ✅</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <ul className="space-y-2 text-sm">
-                  <li className="flex items-center gap-2">
-                    <CheckCircle2 className="h-4 w-4 text-primary" />
-                    Database-level isolation
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <CheckCircle2 className="h-4 w-4 text-primary" />
-                    Row-level security
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <CheckCircle2 className="h-4 w-4 text-primary" />
-                    Cross-tenant prevention
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <CheckCircle2 className="h-4 w-4 text-primary" />
-                    Verified secure
-                  </li>
-                </ul>
-              </CardContent>
-            </Card>
-
-            <Card data-testid="card-rbac">
-              <CardHeader>
-                <Users className="h-10 w-10 text-primary mb-2" />
-                <CardTitle>Role-Based Access Control</CardTitle>
-                <CardDescription>3 roles: Super Admin, Tenant Admin, User</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <ul className="space-y-2 text-sm">
-                  <li className="flex items-center gap-2">
-                    <CheckCircle2 className="h-4 w-4 text-primary" />
-                    Platform-wide super admin
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <CheckCircle2 className="h-4 w-4 text-primary" />
-                    Tenant-level admin
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <CheckCircle2 className="h-4 w-4 text-primary" />
-                    Standard user access
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <CheckCircle2 className="h-4 w-4 text-primary" />
-                    Permission inheritance
-                  </li>
-                </ul>
-              </CardContent>
-            </Card>
-
-            <Card data-testid="card-branding">
-              <CardHeader>
-                <Palette className="h-10 w-10 text-primary mb-2" />
-                <CardTitle>White-Label Branding</CardTitle>
-                <CardDescription>Complete customization per tenant</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <ul className="space-y-2 text-sm">
-                  <li className="flex items-center gap-2">
-                    <CheckCircle2 className="h-4 w-4 text-primary" />
-                    Custom logos & favicons
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <CheckCircle2 className="h-4 w-4 text-primary" />
-                    Brand colors & fonts
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <CheckCircle2 className="h-4 w-4 text-primary" />
-                    Custom CSS injection
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <CheckCircle2 className="h-4 w-4 text-primary" />
-                    Zero Authflow branding
-                  </li>
-                </ul>
-              </CardContent>
-            </Card>
-
-            <Card data-testid="card-user-management">
-              <CardHeader>
-                <Settings className="h-10 w-10 text-primary mb-2" />
-                <CardTitle>User Management</CardTitle>
-                <CardDescription>Complete admin control</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <ul className="space-y-2 text-sm">
-                  <li className="flex items-center gap-2">
-                    <CheckCircle2 className="h-4 w-4 text-primary" />
-                    User CRUD operations
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <CheckCircle2 className="h-4 w-4 text-primary" />
-                    Email invitation system
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <CheckCircle2 className="h-4 w-4 text-primary" />
-                    Activation/deactivation
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <CheckCircle2 className="h-4 w-4 text-primary" />
-                    Tenant-scoped
-                  </li>
-                </ul>
-              </CardContent>
-            </Card>
-          </div>
-        </div>
-      </section>
-
-      {/* OAuth2 & Integration Features */}
-      <section className="py-20 px-4">
-        <div className="container mx-auto">
-          <div className="text-center mb-12">
-            <Badge className="mb-4">OAuth2 & Integration</Badge>
-            <h2 className="text-4xl font-bold mb-4">Be the Auth Provider</h2>
-            <p className="text-muted-foreground max-w-2xl mx-auto">
-              Full OAuth2/OIDC server + API keys + webhooks for seamless integration
-            </p>
-          </div>
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-            <Card data-testid="card-oauth2">
-              <CardHeader>
-                <Globe className="h-10 w-10 text-primary mb-2" />
-                <CardTitle>OAuth2/OIDC Provider</CardTitle>
-                <CardDescription>Full authorization server</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <ul className="space-y-2 text-sm">
-                  <li className="flex items-center gap-2">
-                    <CheckCircle2 className="h-4 w-4 text-primary" />
-                    Authorization code flow
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <CheckCircle2 className="h-4 w-4 text-primary" />
-                    PKCE support
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <CheckCircle2 className="h-4 w-4 text-primary" />
-                    Token endpoint
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <CheckCircle2 className="h-4 w-4 text-primary" />
-                    UserInfo & JWKS
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <CheckCircle2 className="h-4 w-4 text-primary" />
-                    OIDC Discovery
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <CheckCircle2 className="h-4 w-4 text-primary" />
-                    Client management
-                  </li>
-                </ul>
-              </CardContent>
-            </Card>
-
-            <Card data-testid="card-api-keys">
-              <CardHeader>
-                <Key className="h-10 w-10 text-primary mb-2" />
-                <CardTitle>API Key Management</CardTitle>
-                <CardDescription>Permission-based access control</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <ul className="space-y-2 text-sm">
-                  <li className="flex items-center gap-2">
-                    <CheckCircle2 className="h-4 w-4 text-primary" />
-                    Fine-grained permissions
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <CheckCircle2 className="h-4 w-4 text-primary" />
-                    SHA-256 hashed storage
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <CheckCircle2 className="h-4 w-4 text-primary" />
-                    Key revocation
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <CheckCircle2 className="h-4 w-4 text-primary" />
-                    Expiration management
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <CheckCircle2 className="h-4 w-4 text-primary" />
-                    Wildcard permissions
-                  </li>
-                </ul>
-              </CardContent>
-            </Card>
-
-            <Card data-testid="card-webhooks">
-              <CardHeader>
-                <Webhook className="h-10 w-10 text-primary mb-2" />
-                <CardTitle>Webhook System</CardTitle>
-                <CardDescription>Event delivery with retry logic</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <ul className="space-y-2 text-sm">
-                  <li className="flex items-center gap-2">
-                    <CheckCircle2 className="h-4 w-4 text-primary" />
-                    11 event types
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <CheckCircle2 className="h-4 w-4 text-primary" />
-                    HMAC signatures
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <CheckCircle2 className="h-4 w-4 text-primary" />
-                    Exponential backoff
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <CheckCircle2 className="h-4 w-4 text-primary" />
-                    Replay protection
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <CheckCircle2 className="h-4 w-4 text-primary" />
-                    Delivery history
-                  </li>
-                </ul>
-              </CardContent>
-            </Card>
-
-            <Card data-testid="card-notifications">
-              <CardHeader>
-                <Bell className="h-10 w-10 text-primary mb-2" />
-                <CardTitle>Real-Time Notifications</CardTitle>
-                <CardDescription>WebSocket push notifications</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <ul className="space-y-2 text-sm">
-                  <li className="flex items-center gap-2">
-                    <CheckCircle2 className="h-4 w-4 text-primary" />
-                    Socket.IO powered
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <CheckCircle2 className="h-4 w-4 text-primary" />
-                    5 notification types
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <CheckCircle2 className="h-4 w-4 text-primary" />
-                    Read/unread tracking
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <CheckCircle2 className="h-4 w-4 text-primary" />
-                    Priority levels
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <CheckCircle2 className="h-4 w-4 text-primary" />
-                    Instant delivery
-                  </li>
-                </ul>
-              </CardContent>
-            </Card>
-          </div>
-        </div>
-      </section>
-
-      {/* Analytics & Dashboards */}
-      <section className="py-20 px-4 bg-muted/30">
-        <div className="container mx-auto">
-          <div className="text-center mb-12">
-            <Badge className="mb-4">Analytics & Reporting</Badge>
-            <h2 className="text-4xl font-bold mb-4">Data-Driven Insights</h2>
-            <p className="text-muted-foreground max-w-2xl mx-auto">
-              Comprehensive analytics and beautiful dashboards for admins and users
-            </p>
-          </div>
-          <div className="grid md:grid-cols-2 gap-6">
-            <Card data-testid="card-analytics">
-              <CardHeader>
-                <BarChart3 className="h-10 w-10 text-primary mb-2" />
-                <CardTitle>Advanced Analytics</CardTitle>
-                <CardDescription>Trends, metrics, and insights</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <ul className="space-y-2 text-sm">
-                  <li className="flex items-center gap-2">
-                    <CheckCircle2 className="h-4 w-4 text-primary" />
-                    Login trends (date-grouped)
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <CheckCircle2 className="h-4 w-4 text-primary" />
-                    User growth metrics
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <CheckCircle2 className="h-4 w-4 text-primary" />
-                    Security event tracking
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <CheckCircle2 className="h-4 w-4 text-primary" />
-                    Geographic distribution
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <CheckCircle2 className="h-4 w-4 text-primary" />
-                    Failed login analysis
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <CheckCircle2 className="h-4 w-4 text-primary" />
-                    Active user counts
-                  </li>
-                </ul>
-              </CardContent>
-            </Card>
-
-            <Card data-testid="card-dashboards">
-              <CardHeader>
-                <Activity className="h-10 w-10 text-primary mb-2" />
-                <CardTitle>Multi-Level Dashboards</CardTitle>
-                <CardDescription>Tailored views for each role</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <ul className="space-y-2 text-sm">
-                  <li className="flex items-center gap-2">
-                    <CheckCircle2 className="h-4 w-4 text-primary" />
-                    Super Admin dashboard
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <CheckCircle2 className="h-4 w-4 text-primary" />
-                    Tenant Admin dashboard
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <CheckCircle2 className="h-4 w-4 text-primary" />
-                    User dashboard
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <CheckCircle2 className="h-4 w-4 text-primary" />
-                    Dark mode support
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <CheckCircle2 className="h-4 w-4 text-primary" />
-                    Responsive design
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <CheckCircle2 className="h-4 w-4 text-primary" />
-                    Real-time updates
-                  </li>
-                </ul>
-              </CardContent>
-            </Card>
-          </div>
-        </div>
-      </section>
-
-      {/* Technical Specs */}
-      <section className="py-20 px-4">
-        <div className="container mx-auto">
-          <div className="text-center mb-12">
-            <Badge className="mb-4">Technical Specifications</Badge>
-            <h2 className="text-4xl font-bold mb-4">Built on Modern Stack</h2>
-            <p className="text-muted-foreground max-w-2xl mx-auto">
-              Production-ready architecture with enterprise-grade security
-            </p>
-          </div>
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-            <Card>
-              <CardHeader>
-                <Code className="h-8 w-8 text-primary mb-2" />
-                <CardTitle>Backend</CardTitle>
-              </CardHeader>
-              <CardContent className="text-sm space-y-1">
-                <div>• Express.js + TypeScript</div>
-                <div>• PostgreSQL (Neon)</div>
-                <div>• Drizzle ORM</div>
-                <div>• JWT Authentication</div>
-                <div>• Socket.IO WebSockets</div>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <Cloud className="h-8 w-8 text-primary mb-2" />
-                <CardTitle>Frontend</CardTitle>
-              </CardHeader>
-              <CardContent className="text-sm space-y-1">
-                <div>• React + TypeScript</div>
-                <div>• Tailwind CSS</div>
-                <div>• shadcn/ui Components</div>
-                <div>• TanStack Query</div>
-                <div>• Material Design</div>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <Shield className="h-8 w-8 text-primary mb-2" />
-                <CardTitle>Security</CardTitle>
-              </CardHeader>
-              <CardContent className="text-sm space-y-1">
-                <div>• Bcrypt hashing</div>
-                <div>• SHA-256 for secrets</div>
-                <div>• Audit passed ✅</div>
-                <div>• Tenant isolation</div>
-                <div>• GDPR compliant</div>
-              </CardContent>
-            </Card>
-          </div>
-        </div>
-      </section>
-
-      {/* Pricing Preview */}
-      <section className="py-20 px-4 bg-muted/30">
-        <div className="container mx-auto">
-          <div className="text-center mb-12">
-            <Badge className="mb-4">Pricing</Badge>
-            <h2 className="text-4xl font-bold mb-4">80% Cheaper Than Auth0</h2>
-            <p className="text-muted-foreground max-w-2xl mx-auto">
-              Simple, transparent pricing with no hidden fees
-            </p>
-          </div>
-          <div className="grid md:grid-cols-3 gap-6 max-w-5xl mx-auto">
-            <Card>
-              <CardHeader>
-                <CardTitle>Cloud Starter</CardTitle>
-                <div className="text-3xl font-bold mt-4">$50<span className="text-base font-normal text-muted-foreground">/mo</span></div>
-                <CardDescription>Up to 5,000 MAU</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <ul className="space-y-2 text-sm">
-                  <li className="flex items-center gap-2">
-                    <CheckCircle2 className="h-4 w-4 text-primary" />
-                    All 22 features included
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <CheckCircle2 className="h-4 w-4 text-primary" />
-                    Unlimited tenants
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <CheckCircle2 className="h-4 w-4 text-primary" />
-                    Email support
-                  </li>
-                </ul>
-              </CardContent>
-            </Card>
-
-            <Card className="border-primary">
-              <CardHeader>
-                <Badge className="w-fit mb-2">Most Popular</Badge>
-                <CardTitle>Cloud Pro</CardTitle>
-                <div className="text-3xl font-bold mt-4">$200<span className="text-base font-normal text-muted-foreground">/mo</span></div>
-                <CardDescription>Up to 25,000 MAU</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <ul className="space-y-2 text-sm">
-                  <li className="flex items-center gap-2">
-                    <CheckCircle2 className="h-4 w-4 text-primary" />
-                    Everything in Starter
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <CheckCircle2 className="h-4 w-4 text-primary" />
-                    Priority support
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <CheckCircle2 className="h-4 w-4 text-primary" />
-                    99.9% SLA
-                  </li>
-                </ul>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle>Self-Hosted</CardTitle>
-                <div className="text-3xl font-bold mt-4">$499<span className="text-base font-normal text-muted-foreground">/mo</span></div>
-                <CardDescription>Unlimited users</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <ul className="space-y-2 text-sm">
-                  <li className="flex items-center gap-2">
-                    <CheckCircle2 className="h-4 w-4 text-primary" />
-                    Your infrastructure
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <CheckCircle2 className="h-4 w-4 text-primary" />
-                    Complete control
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <CheckCircle2 className="h-4 w-4 text-primary" />
-                    White-glove support
-                  </li>
-                </ul>
-              </CardContent>
-            </Card>
-          </div>
-        </div>
-      </section>
-
-      {/* CTA Section */}
-      <section className="py-20 px-4">
-        <div className="container mx-auto text-center">
-          <h2 className="text-4xl font-bold mb-6">Ready to Replace Auth0?</h2>
-          <p className="text-xl text-muted-foreground mb-8 max-w-2xl mx-auto">
-            Join companies saving 80% on authentication while getting more features
-          </p>
-          <div className="flex gap-4 justify-center flex-wrap">
-            <Link href="/register">
-              <Button size="lg" className="gap-2" data-testid="button-start-now">
-                <Zap className="h-5 w-5" />
-                Start Free Trial
+            <Link href="/comparison">
+              <Button
+                size="lg"
+                variant="outline"
+                className="gap-2 h-12 px-8 bg-primary/10 hover:bg-primary/20"
+                data-testid="button-cta-compare"
+              >
+                View Full Comparison
+                <ArrowRight className="h-5 w-5" />
               </Button>
             </Link>
-            <Link href="/login">
-              <Button size="lg" variant="outline" data-testid="button-view-demo">
-                View Demo
-              </Button>
-            </Link>
+          </div>
+          <div className="flex gap-6 sm:gap-8 justify-center flex-wrap text-sm opacity-90">
+            <div className="flex items-center gap-2">
+              <CheckCircle2 className="h-5 w-5" />
+              <span>14-day free trial</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <CheckCircle2 className="h-5 w-5" />
+              <span>No credit card needed</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <CheckCircle2 className="h-5 w-5" />
+              <span>Cancel anytime</span>
+            </div>
           </div>
         </div>
       </section>
 
       {/* Footer */}
-      <footer className="border-t py-12 px-4 bg-muted/30">
+      <footer className="border-t py-12 px-4 sm:px-6 lg:px-8 bg-muted/30">
         <div className="container mx-auto">
-          <div className="grid md:grid-cols-4 gap-8">
+          <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-8 mb-8">
             <div>
               <div className="flex items-center gap-2 mb-4">
                 <Shield className="h-6 w-6 text-primary" />
-                <span className="text-xl font-bold">Authflow</span>
+                <span className="text-lg font-bold">Authflow</span>
               </div>
               <p className="text-sm text-muted-foreground">
-                Enterprise authentication platform. Replace Auth0 at 80% lower cost.
+                Enterprise authentication platform for modern businesses.
               </p>
             </div>
             <div>
               <h3 className="font-semibold mb-4">Product</h3>
               <ul className="space-y-2 text-sm text-muted-foreground">
-                <li>Features</li>
-                <li>Pricing</li>
-                <li>Documentation</li>
-                <li>API Reference</li>
+                <li>
+                  <Link href="/comparison">
+                    <span className="hover:text-foreground cursor-pointer">Pricing</span>
+                  </Link>
+                </li>
+                <li>
+                  <Link href="/why-authflow">
+                    <span className="hover:text-foreground cursor-pointer">Features</span>
+                  </Link>
+                </li>
+                <li>
+                  <span className="hover:text-foreground cursor-pointer">Documentation</span>
+                </li>
               </ul>
             </div>
             <div>
               <h3 className="font-semibold mb-4">Company</h3>
               <ul className="space-y-2 text-sm text-muted-foreground">
-                <li>About</li>
-                <li>Blog</li>
-                <li>Careers</li>
-                <li>Contact</li>
+                <li>
+                  <span className="hover:text-foreground cursor-pointer">About</span>
+                </li>
+                <li>
+                  <span className="hover:text-foreground cursor-pointer">Blog</span>
+                </li>
+                <li>
+                  <span className="hover:text-foreground cursor-pointer">Careers</span>
+                </li>
               </ul>
             </div>
             <div>
               <h3 className="font-semibold mb-4">Legal</h3>
               <ul className="space-y-2 text-sm text-muted-foreground">
-                <li>Privacy Policy</li>
-                <li>Terms of Service</li>
-                <li>Security</li>
-                <li>Compliance</li>
+                <li>
+                  <span className="hover:text-foreground cursor-pointer">Privacy</span>
+                </li>
+                <li>
+                  <span className="hover:text-foreground cursor-pointer">Terms</span>
+                </li>
+                <li>
+                  <span className="hover:text-foreground cursor-pointer">Security</span>
+                </li>
               </ul>
             </div>
           </div>
-          <div className="border-t mt-8 pt-8 text-center text-sm text-muted-foreground">
-            <p>© 2025 Authflow. All rights reserved. Built with security and scale in mind.</p>
+          <div className="border-t pt-8 text-center text-sm text-muted-foreground">
+            <p>
+              © 2025 Authflow. All rights reserved. Built with enterprise security in mind.
+            </p>
           </div>
         </div>
       </footer>
