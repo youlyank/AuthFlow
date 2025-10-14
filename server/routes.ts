@@ -955,10 +955,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
       await storage.deleteInvitationToken(invitationToken.id);
 
       // Create session
-      const sessionToken = generateToken();
+      const sessionToken = generateToken({ 
+        userId: user.id, 
+        email: user.email, 
+        role: user.role, 
+        tenantId: user.tenantId || undefined 
+      });
+      const refreshToken = generateRefreshToken();
       const session = await storage.createSession({
         userId: user.id,
         token: sessionToken,
+        refreshToken,
         expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000), // 24 hours
         userAgent: req.headers["user-agent"] || "Unknown",
         ipAddress,
@@ -2035,7 +2042,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const result = await migrationService.importUsers(users, importOptions);
 
-      await auditLog(req, "users.imported", "user", null, { 
+      await auditLog(req, "users.imported", "user", undefined, { 
         total: result.total,
         imported: result.imported,
         skipped: result.skipped,

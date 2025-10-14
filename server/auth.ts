@@ -205,6 +205,7 @@ const RATE_LIMIT_CONFIG = {
   register: { maxAttempts: 3, windowMinutes: 60, blockMinutes: 60 },
   passwordReset: { maxAttempts: 3, windowMinutes: 60, blockMinutes: 30 },
   passwordResetComplete: { maxAttempts: 5, windowMinutes: 15, blockMinutes: 30 },
+  acceptInvitation: { maxAttempts: 5, windowMinutes: 15, blockMinutes: 30 },
   mfaVerify: { maxAttempts: 5, windowMinutes: 15, blockMinutes: 15 },
   magicLinkRequest: { maxAttempts: 3, windowMinutes: 60, blockMinutes: 30 },
   magicLinkVerify: { maxAttempts: 10, windowMinutes: 15, blockMinutes: 15 },
