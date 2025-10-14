@@ -1,4 +1,4 @@
-import { generateKeyPairSync } from "crypto";
+import { generateKeyPairSync, createPublicKey } from "crypto";
 import { writeFileSync, readFileSync, existsSync, mkdirSync } from "fs";
 import { join } from "path";
 
@@ -85,18 +85,34 @@ export const rsaKeys = getOrCreateRSAKeys();
 
 // Export public key in JWK format for JWKS endpoint
 export function getJWKS() {
-  const publicKeyObject = require("crypto").createPublicKey(rsaKeys.publicKey);
-  const jwk = publicKeyObject.export({ format: "jwk" });
+  try {
+    console.log("🔍 getJWKS: Starting JWKS generation");
+    console.log("🔍 getJWKS: rsaKeys.kid =", rsaKeys.kid);
+    console.log("🔍 getJWKS: publicKey length =", rsaKeys.publicKey?.length || 0);
+    
+    const publicKeyObject = createPublicKey(rsaKeys.publicKey);
+    console.log("🔍 getJWKS: Public key object created successfully");
+    
+    const jwk = publicKeyObject.export({ format: "jwk" }) as any;
+    console.log("🔍 getJWKS: JWK exported, has n?", !!jwk.n, "has e?", !!jwk.e);
 
-  return {
-    keys: [
-      {
-        ...jwk,
-        kid: rsaKeys.kid,
-        use: "sig", // Signature use
-        alg: "RS256", // Algorithm
-        kty: "RSA", // Key type
-      },
-    ],
-  };
+    const jwks = {
+      keys: [
+        {
+          kty: "RSA",
+          use: "sig",
+          alg: "RS256",
+          kid: rsaKeys.kid,
+          n: jwk.n, // Modulus
+          e: jwk.e, // Exponent
+        },
+      ],
+    };
+    
+    console.log("✅ JWKS generated with", jwks.keys.length, "key(s), kid:", rsaKeys.kid);
+    return jwks;
+  } catch (error) {
+    console.error("❌ Error generating JWKS:", error);
+    return { keys: [] };
+  }
 }

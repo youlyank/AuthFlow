@@ -3,14 +3,11 @@ import jwt from "jsonwebtoken";
 import { randomBytes, createHash } from "crypto";
 import type { Request, Response, NextFunction } from "express";
 import { storage } from "./storage";
+import { rsaKeys } from "./keys";
 
-if (!process.env.JWT_SECRET) {
-  throw new Error(
-    "JWT_SECRET must be set. This is a critical security requirement for the authentication platform."
-  );
-}
+// Using RSA asymmetric signing for enterprise-grade security
+console.log("🔐 JWT signing with RSA-4096 asymmetric keys (kid:", rsaKeys.kid + ")");
 
-const JWT_SECRET = process.env.JWT_SECRET;
 const JWT_EXPIRES_IN = "7d";
 const REFRESH_TOKEN_EXPIRES_IN = "30d";
 
@@ -30,7 +27,11 @@ export async function verifyPassword(password: string, hash: string): Promise<bo
 }
 
 export function generateToken(payload: JwtPayload): string {
-  return jwt.sign(payload, JWT_SECRET, { expiresIn: JWT_EXPIRES_IN });
+  return jwt.sign(payload, rsaKeys.privateKey, { 
+    algorithm: "RS256",
+    expiresIn: JWT_EXPIRES_IN,
+    keyid: rsaKeys.kid, // Include key ID in JWT header
+  });
 }
 
 export function generateRefreshToken(): string {
@@ -38,7 +39,9 @@ export function generateRefreshToken(): string {
 }
 
 export function verifyToken(token: string): JwtPayload {
-  return jwt.verify(token, JWT_SECRET) as JwtPayload;
+  return jwt.verify(token, rsaKeys.publicKey, {
+    algorithms: ["RS256"], // Only accept RS256 for security
+  }) as JwtPayload;
 }
 
 // OAuth2 Token Generation and Hashing

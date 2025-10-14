@@ -30,6 +30,7 @@ import downloadRoutes from "./download-routes";
 import { z } from "zod";
 import { emailService } from "./email";
 import { migrationService } from "./migration";
+import { getJWKS } from "./keys";
 import speakeasy from "speakeasy";
 import QRCode from "qrcode";
 import { randomBytes, createHash } from "crypto";
@@ -2689,13 +2690,51 @@ export async function registerRoutes(app: Express): Promise<Server> {
       jwks_uri: `${baseUrl}/.well-known/jwks.json`,
       response_types_supported: ["code"],
       subject_types_supported: ["public"],
-      id_token_signing_alg_values_supported: ["RS256", "HS256"],
+      id_token_signing_alg_values_supported: ["RS256"],
       scopes_supported: ["openid", "profile", "email"],
       token_endpoint_auth_methods_supported: ["client_secret_post", "client_secret_basic"],
       claims_supported: ["sub", "name", "given_name", "family_name", "email", "email_verified"],
       code_challenge_methods_supported: ["S256", "plain"],
       grant_types_supported: ["authorization_code", "refresh_token"],
     });
+  });
+
+  // JWKS Test Endpoint - Simple text test
+  app.get("/api/test/simple", (req: Request, res: Response) => {
+    res.setHeader('Content-Type', 'text/plain');
+    res.send("SIMPLE TEST WORKS");
+  });
+
+  // JWKS Test Endpoint
+  app.get("/api/test/jwks", (req: Request, res: Response) => {
+    try {
+      const jwks = getJWKS();
+      const response = { 
+        success: true,
+        jwks,
+        keysCount: jwks.keys?.length || 0,
+        hasModulus: jwks.keys?.[0]?.n ? "yes" : "no"
+      };
+      console.log("[TEST JWKS] Sending response:", JSON.stringify(response).substring(0, 200));
+      res.status(200).setHeader('Content-Type', 'application/json').json(response);
+    } catch (error: any) {
+      console.log("[TEST JWKS] Error:", error.message);
+      res.status(500).json({ success: false, error: error.message });
+    }
+  });
+
+  // JWKS Endpoint - Provides public keys for JWT verification
+  app.get("/.well-known/jwks.json", (req: Request, res: Response) => {
+    try {
+      console.log("[JWKS ENDPOINT] getJWKS called");
+      const jwks = getJWKS();
+      console.log("[JWKS ENDPOINT] Result:", JSON.stringify(jwks).substring(0, 100));
+      res.setHeader('Content-Type', 'application/json');
+      res.status(200).json(jwks);
+    } catch (error: any) {
+      console.error("[JWKS ENDPOINT] Fatal error:", error);
+      res.status(500).json({ error: "Failed to generate JWKS" });
+    }
   });
 
   // =======================
