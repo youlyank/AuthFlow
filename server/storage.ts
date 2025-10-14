@@ -447,6 +447,43 @@ export class DbStorage implements IStorage {
       .limit(limit);
   }
 
+  async getRecentFailedLogins(email: string, limit = 10): Promise<any[]> {
+    const oneHourAgo = new Date();
+    oneHourAgo.setHours(oneHourAgo.getHours() - 1);
+    
+    return db
+      .select()
+      .from(loginHistory)
+      .where(
+        and(
+          eq(loginHistory.email, email),
+          eq(loginHistory.success, false),
+          gt(loginHistory.createdAt, oneHourAgo)
+        )
+      )
+      .orderBy(desc(loginHistory.createdAt))
+      .limit(limit);
+  }
+
+  async getRecentFailedLoginsByIP(ipAddress: string, email: string, limit = 10): Promise<any[]> {
+    const oneHourAgo = new Date();
+    oneHourAgo.setHours(oneHourAgo.getHours() - 1);
+    
+    return db
+      .select()
+      .from(loginHistory)
+      .where(
+        and(
+          eq(loginHistory.ipAddress, ipAddress),
+          eq(loginHistory.email, email),
+          eq(loginHistory.success, false),
+          gt(loginHistory.createdAt, oneHourAgo)
+        )
+      )
+      .orderBy(desc(loginHistory.createdAt))
+      .limit(limit);
+  }
+
   async getSuperAdminStats(): Promise<any> {
     const [tenantCount] = await db.select({ count: count() }).from(tenants);
     const [activeTenantsCount] = await db

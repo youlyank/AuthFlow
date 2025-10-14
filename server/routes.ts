@@ -475,7 +475,38 @@ export async function registerRoutes(app: Express): Promise<Server> {
           userAgent: req.headers["user-agent"],
           failureReason: "Invalid password",
         });
+        
+        // ATTACK PROTECTION: Auto-block IP after too many failed attempts FROM SAME IP
+        const recentFailedLoginsFromIP = await storage.getRecentFailedLoginsByIP(ipAddress, data.email, 10);
+        if (recentFailedLoginsFromIP.length >= 5 && user.tenantId) {
+          await autoBlockIP(
+            ipAddress, 
+            user.tenantId, 
+            `${recentFailedLoginsFromIP.length} failed login attempts from this IP`
+          );
+        }
+        
         return res.status(401).json({ error: "Invalid credentials" });
+      }
+
+      // ATTACK PROTECTION: Detect suspicious login patterns
+      const currentIp = req.ip || "unknown";
+      const suspiciousLogin = await detectSuspiciousLogin(user.id, currentIp, user);
+      
+      // Create security events for each detected anomaly
+      if (suspiciousLogin.suspicious) {
+        for (const event of suspiciousLogin.events) {
+          await createSecurityEvent(
+            user.id,
+            event.type,
+            event.riskScore,
+            event.details,
+            req
+          );
+        }
+        
+        // Log suspicious login for admin review
+        console.log(`Suspicious login detected for user ${user.email}:`, suspiciousLogin.events.map(e => e.description).join(', '));
       }
 
       // Check if MFA is enabled
@@ -2582,6 +2613,114 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
     } catch (error) {
       console.error("Failed to create security event:", error);
+    }
+  }
+
+  // Suspicious Login Detection
+  async function detectSuspiciousLogin(
+    userId: string, 
+    currentIp: string, 
+    user: any
+  ): Promise<{ suspicious: boolean; events: any[] }> {
+    const detectedEvents: any[] = [];
+    
+    // 1. Check for unusual location (different IP from last login)
+    if (user.lastLoginIp && user.lastLoginIp !== currentIp) {
+      const ipChanged = !currentIp.startsWith(user.lastLoginIp.split('.')[0]); // Check if subnet changed
+      if (ipChanged) {
+        detectedEvents.push({
+          type: 'unusual_location',
+          riskScore: 40,
+          details: { previousIp: user.lastLoginIp, currentIp },
+          description: 'Login from new location'
+        });
+      }
+    }
+    
+    // 2. Check for unusual time (login between 2 AM - 5 AM local time is suspicious)
+    const hour = new Date().getHours();
+    if (hour >= 2 && hour < 5) {
+      detectedEvents.push({
+        type: 'unusual_time',
+        riskScore: 20,
+        details: { hour },
+        description: 'Login during unusual hours (2 AM - 5 AM)'
+      });
+    }
+    
+    // 3. Check for velocity (impossible travel - login from different location too quickly)
+    if (user.lastLoginAt) {
+      const timeSinceLastLogin = Date.now() - new Date(user.lastLoginAt).getTime();
+      const minutesSinceLastLogin = timeSinceLastLogin / (1000 * 60);
+      
+      // If last login was less than 30 minutes ago and IP changed significantly
+      if (minutesSinceLastLogin < 30 && user.lastLoginIp && user.lastLoginIp !== currentIp) {
+        detectedEvents.push({
+          type: 'velocity_check_failed',
+          riskScore: 60,
+          details: { 
+            minutesSinceLastLogin: Math.round(minutesSinceLastLogin),
+            previousIp: user.lastLoginIp,
+            currentIp 
+          },
+          description: 'Impossible travel detected (login from different location too quickly)'
+        });
+      }
+    }
+    
+    // 4. Check for multiple failed attempts (recent failed login history)
+    const recentFailedLogins = await storage.getRecentFailedLogins(user.email, 10);
+    if (recentFailedLogins.length >= 3) {
+      detectedEvents.push({
+        type: 'multiple_failed_attempts',
+        riskScore: 50,
+        details: { failedAttempts: recentFailedLogins.length },
+        description: `${recentFailedLogins.length} failed login attempts detected recently`
+      });
+    }
+    
+    return {
+      suspicious: detectedEvents.length > 0,
+      events: detectedEvents
+    };
+  }
+
+  // Auto IP Blocking (when rate limit threshold exceeded)
+  async function autoBlockIP(
+    ipAddress: string, 
+    tenantId: string | null, 
+    reason: string
+  ): Promise<void> {
+    try {
+      // Only auto-block if tenant exists (don't block platform-wide)
+      if (!tenantId) {
+        console.log(`Skipping auto-block for IP ${ipAddress} - no tenant context`);
+        return;
+      }
+      
+      // Check if IP is already blocked
+      const existingRestrictions = await storage.getIpRestrictions(tenantId);
+      const alreadyBlocked = existingRestrictions.some(
+        r => r.type === 'block' && r.ipAddress === ipAddress && r.isActive
+      );
+      
+      if (alreadyBlocked) {
+        console.log(`IP ${ipAddress} already blocked for tenant ${tenantId}`);
+        return;
+      }
+      
+      // Create IP block restriction
+      await storage.createIpRestriction({
+        tenantId,
+        type: 'block',
+        ipAddress,
+        description: `Auto-blocked: ${reason}`,
+        isActive: true,
+      });
+      
+      console.log(`Auto-blocked IP ${ipAddress} for tenant ${tenantId}: ${reason}`);
+    } catch (error) {
+      console.error("Failed to auto-block IP:", error);
     }
   }
 
