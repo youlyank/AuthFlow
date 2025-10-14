@@ -28,6 +28,7 @@ import { generateWebhookSecret } from "./webhooks";
 import { loginSchema, registerSchema, mfaVerifySchema, createNotificationSchema, passwordResetRequestSchema, passwordResetSchema, updateTenantSettingsSchema, tenants } from "@shared/schema";
 import downloadRoutes from "./download-routes";
 import { emailService } from "./email";
+import { migrationService } from "./migration";
 import speakeasy from "speakeasy";
 import QRCode from "qrcode";
 import { randomBytes, createHash } from "crypto";
@@ -1912,6 +1913,56 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error: any) {
       console.error("Error deleting API key:", error);
       res.status(500).json({ error: "Failed to delete API key" });
+    }
+  });
+
+  // ===== Auth0 Migration Endpoint =====
+
+  // Import users from Auth0 export (JSON or CSV)
+  app.post("/api/admin/import-users", requireAuth, requireRole(["tenant_admin", "super_admin"]), async (req: Request, res: Response) => {
+    try {
+      const { data, format = "json", options = {} } = req.body;
+
+      if (!data) {
+        return res.status(400).json({ error: "Data is required" });
+      }
+
+      // Parse users based on format
+      let users;
+      try {
+        if (format === "csv") {
+          users = migrationService.parseCSV(data);
+        } else {
+          users = migrationService.parseAuth0Export(data);
+        }
+      } catch (error: any) {
+        return res.status(400).json({ error: `Failed to parse ${format.toUpperCase()}: ${error.message}` });
+      }
+
+      // Import users with options
+      const importOptions = {
+        tenantId: req.user.tenantId!,
+        defaultRole: options.defaultRole || "user",
+        overwriteExisting: options.overwriteExisting || false,
+        generatePasswordsIfMissing: options.generatePasswordsIfMissing || false,
+      };
+
+      const result = await migrationService.importUsers(users, importOptions);
+
+      await auditLog(req, "users.imported", "user", null, { 
+        total: result.total,
+        imported: result.imported,
+        skipped: result.skipped,
+        errorCount: result.errors.length
+      });
+
+      res.json({
+        message: "Import completed",
+        result,
+      });
+    } catch (error: any) {
+      console.error("Error importing users:", error);
+      res.status(500).json({ error: "Failed to import users" });
     }
   });
 
