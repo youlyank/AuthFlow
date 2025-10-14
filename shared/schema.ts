@@ -920,6 +920,8 @@ export const securityEvents = pgTable(
     ipAddress: text("ip_address"),
     location: text("location"),
     resolved: boolean("resolved").notNull().default(false),
+    resolvedAt: timestamp("resolved_at"),
+    resolvedBy: varchar("resolved_by").references(() => users.id),
     createdAt: timestamp("created_at").notNull().defaultNow(),
   },
   (table) => ({

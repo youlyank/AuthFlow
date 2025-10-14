@@ -1145,6 +1145,28 @@ export class DbStorage implements IStorage {
       .limit(100);
   }
 
+  async getSecurityEventById(eventId: string): Promise<any> {
+    const [event] = await db
+      .select()
+      .from(securityEvents)
+      .where(eq(securityEvents.id, eventId))
+      .limit(1);
+    return event;
+  }
+
+  async resolveSecurityEvent(eventId: string, resolvedBy: string): Promise<any> {
+    const [event] = await db
+      .update(securityEvents)
+      .set({ 
+        resolved: true, 
+        resolvedAt: new Date(),
+        resolvedBy 
+      })
+      .where(eq(securityEvents.id, eventId))
+      .returning();
+    return event;
+  }
+
   // =======================
   // IP RESTRICTION METHODS
   // =======================

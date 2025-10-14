@@ -2527,6 +2527,41 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Resolve Security Event
+  app.post("/api/security-events/:id/resolve", requireAuth, requireRole(["super_admin", "tenant_admin"]), async (req: Request, res: Response) => {
+    try {
+      const { id } = req.params;
+      
+      // First, fetch the event to verify tenant ownership
+      const existingEvent = await storage.getSecurityEventById(id);
+      
+      if (!existingEvent) {
+        return res.status(404).json({ error: "Event not found" });
+      }
+      
+      // Verify tenant isolation: tenant admins can only resolve events for users in their tenant
+      if (req.user.role === "tenant_admin") {
+        if (!existingEvent.userId) {
+          return res.status(403).json({ error: "Forbidden: Event has no associated user" });
+        }
+        
+        const eventUser = await storage.getUser(existingEvent.userId);
+        if (!eventUser || eventUser.tenantId !== req.user.tenantId) {
+          return res.status(403).json({ error: "Forbidden: Cannot resolve events from other tenants" });
+        }
+      }
+      
+      const event = await storage.resolveSecurityEvent(id, req.user.id);
+      
+      await auditLog(req, "security_event_resolved", "security_event", id, { eventType: event.type });
+      
+      res.json(event);
+    } catch (error: any) {
+      console.error("Resolve security event error:", error);
+      res.status(500).json({ error: "Failed to resolve event" });
+    }
+  });
+
   // Create Security Event (internal use)
   async function createSecurityEvent(
     userId: string | null,

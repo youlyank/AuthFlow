@@ -32,6 +32,9 @@ import ApiKeyManagement from "@/pages/ApiKeyManagement";
 import OAuth2ConsentPage from "@/pages/OAuth2ConsentPage";
 import OAuth2ClientManagement from "@/pages/OAuth2ClientManagement";
 import IpRestrictionsPage from "@/pages/IpRestrictionsPage";
+import SecurityEventsPage from "@/pages/SecurityEventsPage";
+import AdvancedAnalyticsPage from "@/pages/AdvancedAnalyticsPage";
+import BrandingCustomizationPage from "@/pages/BrandingCustomizationPage";
 import FeaturesDemoPage from "@/pages/FeaturesDemoPage";
 import ComparisonPage from "@/pages/ComparisonPage";
 import WhyAuthflowPage from "@/pages/WhyAuthflowPage";
@@ -237,6 +240,30 @@ function Router() {
         <ProtectedRoute allowedRoles={["tenant_admin"]}>
           <DashboardLayout>
             <IpRestrictionsPage />
+          </DashboardLayout>
+        </ProtectedRoute>
+      </Route>
+
+      <Route path="/admin/security-events">
+        <ProtectedRoute allowedRoles={["super_admin", "tenant_admin"]}>
+          <DashboardLayout>
+            <SecurityEventsPage />
+          </DashboardLayout>
+        </ProtectedRoute>
+      </Route>
+
+      <Route path="/admin/analytics">
+        <ProtectedRoute allowedRoles={["super_admin", "tenant_admin"]}>
+          <DashboardLayout>
+            <AdvancedAnalyticsPage />
+          </DashboardLayout>
+        </ProtectedRoute>
+      </Route>
+
+      <Route path="/admin/branding">
+        <ProtectedRoute allowedRoles={["super_admin", "tenant_admin"]}>
+          <DashboardLayout>
+            <BrandingCustomizationPage />
           </DashboardLayout>
         </ProtectedRoute>
       </Route>

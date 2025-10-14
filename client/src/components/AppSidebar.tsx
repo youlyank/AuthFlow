@@ -37,6 +37,8 @@ import {
   Sparkles,
   Webhook,
   Globe,
+  AlertTriangle,
+  Palette,
 } from "lucide-react";
 import { Logo } from "./Logo";
 import type { User } from "@shared/schema";
@@ -131,6 +133,11 @@ const tenantAdminItems = [
     icon: Globe,
   },
   {
+    title: "Security Events",
+    url: "/admin/security-events",
+    icon: AlertTriangle,
+  },
+  {
     title: "Analytics",
     url: "/admin/analytics",
     icon: BarChart3,
@@ -139,6 +146,11 @@ const tenantAdminItems = [
     title: "Notifications",
     url: "/admin/notifications",
     icon: Bell,
+  },
+  {
+    title: "Branding",
+    url: "/admin/branding",
+    icon: Palette,
   },
   {
     title: "Settings",
