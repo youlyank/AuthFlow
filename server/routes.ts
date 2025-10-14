@@ -27,6 +27,7 @@ import {
 import { generateWebhookSecret } from "./webhooks";
 import { loginSchema, registerSchema, mfaVerifySchema, createNotificationSchema, passwordResetRequestSchema, passwordResetSchema, updateTenantSettingsSchema, tenants } from "@shared/schema";
 import downloadRoutes from "./download-routes";
+import { z } from "zod";
 import { emailService } from "./email";
 import { migrationService } from "./migration";
 import speakeasy from "speakeasy";
