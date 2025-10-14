@@ -126,7 +126,7 @@ export default function LandingPage() {
 
   const comparisons = [
     { metric: "Base Price", authflow: "$99/mo", auth0: "$240/mo", okta: "$2,400/mo" },
-    { metric: "Per-User Cost", authflow: "$0", auth0: "$0.05-0.15", okta: "$2-5" },
+    { metric: "Per-User Cost", authflow: "$0", auth0: "$0.50/user", okta: "$2-5/user" },
     { metric: "Multi-Tenancy", authflow: "Included", auth0: "Paid Add-on", okta: "Enterprise Only" },
     { metric: "Self-Hosting", authflow: "Available", auth0: "Not Available", okta: "Not Available" },
   ];
