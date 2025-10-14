@@ -11,7 +11,7 @@ import { Switch } from "@/components/ui/switch";
 import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { useToast } from "@/hooks/use-toast";
 import { Separator } from "@/components/ui/separator";
-import { Shield, ShieldCheck, Smartphone, Mail, Trash2, Monitor, Clock } from "lucide-react";
+import { Shield, ShieldCheck, Smartphone, Mail, Trash2, Monitor, Clock, Download, AlertTriangle } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useAuth } from "@/hooks/useAuth";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -38,6 +38,7 @@ export default function SecuritySettings() {
   const [showEmailOtpDialog, setShowEmailOtpDialog] = useState(false);
   const [otpCode, setOtpCode] = useState("");
   const [rememberDevice, setRememberDevice] = useState(false);
+  const [showDeleteAccountDialog, setShowDeleteAccountDialog] = useState(false);
 
   const disableMfaForm = useForm<PasswordFormValues>({
     resolver: zodResolver(passwordSchema),
@@ -145,6 +146,47 @@ export default function SecuritySettings() {
         variant: "destructive",
         title: "Error",
         description: error.message || "Failed to remove device",
+      });
+    },
+  });
+
+  // Export data mutation
+  const exportDataMutation = useMutation({
+    mutationFn: async () => {
+      return apiRequest("POST", "/api/gdpr/export");
+    },
+    onSuccess: () => {
+      toast({
+        title: "Data Export Requested",
+        description: "You'll receive an email when your data is ready to download",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        variant: "destructive",
+        title: "Export Failed",
+        description: error.message || "Failed to request data export",
+      });
+    },
+  });
+
+  // Delete account mutation
+  const deleteAccountMutation = useMutation({
+    mutationFn: async () => {
+      return apiRequest("POST", "/api/gdpr/delete");
+    },
+    onSuccess: () => {
+      setShowDeleteAccountDialog(false);
+      toast({
+        title: "Account Deletion Requested",
+        description: "Your account will be deleted within 30 days. Check your email for details.",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        variant: "destructive",
+        title: "Deletion Failed",
+        description: error.message || "Failed to request account deletion",
       });
     },
   });
@@ -325,7 +367,97 @@ export default function SecuritySettings() {
             </div>
           </CardContent>
         </Card>
+
+        {/* GDPR Compliance */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <AlertTriangle className="w-5 h-5" />
+              Data & Privacy
+            </CardTitle>
+            <CardDescription>
+              Manage your personal data and account deletion
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="flex items-center justify-between">
+              <div className="flex-1">
+                <Label>Export My Data</Label>
+                <p className="text-sm text-muted-foreground">
+                  Download all your personal data in a portable format (GDPR Article 20)
+                </p>
+              </div>
+              <Button
+                variant="outline"
+                onClick={() => exportDataMutation.mutate()}
+                disabled={exportDataMutation.isPending}
+                data-testid="button-export-data"
+              >
+                <Download className="mr-2 h-4 w-4" />
+                {exportDataMutation.isPending ? "Requesting..." : "Export Data"}
+              </Button>
+            </div>
+            <Separator />
+            <div className="flex items-center justify-between">
+              <div className="flex-1">
+                <Label className="text-destructive">Delete My Account</Label>
+                <p className="text-sm text-muted-foreground">
+                  Permanently delete your account and all associated data (GDPR Article 17)
+                </p>
+              </div>
+              <Button
+                variant="destructive"
+                onClick={() => setShowDeleteAccountDialog(true)}
+                data-testid="button-delete-account"
+              >
+                <Trash2 className="mr-2 h-4 w-4" />
+                Delete Account
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
       </div>
+
+      {/* Delete Account Confirmation Dialog */}
+      <Dialog open={showDeleteAccountDialog} onOpenChange={setShowDeleteAccountDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-destructive">
+              <AlertTriangle className="h-5 w-5" />
+              Delete Account Permanently?
+            </DialogTitle>
+            <DialogDescription>
+              This action cannot be undone. Your account and all associated data will be permanently deleted within 30 days. You will receive an email confirmation.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="bg-destructive/10 border border-destructive/20 rounded-md p-4">
+            <p className="text-sm text-destructive font-medium">What will be deleted:</p>
+            <ul className="text-sm text-muted-foreground mt-2 space-y-1 list-disc list-inside">
+              <li>Your profile and personal information</li>
+              <li>All authentication methods and sessions</li>
+              <li>Account history and audit logs</li>
+              <li>All associated data and settings</li>
+            </ul>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setShowDeleteAccountDialog(false)}
+              data-testid="button-cancel-delete"
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={() => deleteAccountMutation.mutate()}
+              disabled={deleteAccountMutation.isPending}
+              data-testid="button-confirm-delete"
+            >
+              {deleteAccountMutation.isPending ? "Processing..." : "Yes, Delete My Account"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Email OTP Verification Dialog */}
       <Dialog open={showEmailOtpDialog} onOpenChange={setShowEmailOtpDialog}>

@@ -1,13 +1,17 @@
 import { randomBytes } from "crypto";
+import { Resend } from "resend";
 
-// Email service - can be extended with Resend, SendGrid, etc.
+// Initialize Resend client (will be null if no API key)
+const resend = process.env.RESEND_API_KEY ? new Resend(process.env.RESEND_API_KEY) : null;
+
+// Email service - Production ready with Resend
 export class EmailService {
   async sendEmail(to: string, subject: string, html: string): Promise<void> {
     // In development, log to console
-    if (process.env.NODE_ENV !== "production") {
+    if (process.env.NODE_ENV !== "production" || !resend) {
       console.log(`
 ═══════════════════════════════════════════════════════════
-📧 EMAIL SENT
+📧 EMAIL ${resend ? "SENT" : "SIMULATED (No API key)"}
 ═══════════════════════════════════════════════════════════
 To: ${to}
 Subject: ${subject}
@@ -15,30 +19,38 @@ Subject: ${subject}
 ${html.replace(/<[^>]*>/g, "")}
 ═══════════════════════════════════════════════════════════
       `);
+      
+      // If Resend is configured, actually send in development too
+      if (resend) {
+        try {
+          await resend.emails.send({
+            from: process.env.EMAIL_FROM || "Authflow <onboarding@resend.dev>",
+            to,
+            subject,
+            html,
+          });
+        } catch (error) {
+          console.error("Resend error:", error);
+        }
+      }
       return;
     }
 
-    // In production, use email service
-    if (process.env.RESEND_API_KEY) {
-      const response = await fetch("https://api.resend.com/emails", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${process.env.RESEND_API_KEY}`,
-        },
-        body: JSON.stringify({
-          from: process.env.EMAIL_FROM || "noreply@authflow.com",
+    // In production with Resend configured
+    if (resend) {
+      try {
+        await resend.emails.send({
+          from: process.env.EMAIL_FROM || "Authflow <onboarding@resend.dev>",
           to,
           subject,
           html,
-        }),
-      });
-
-      if (!response.ok) {
-        throw new Error(`Email failed: ${await response.text()}`);
+        });
+      } catch (error) {
+        console.error("Failed to send email:", error);
+        throw new Error(`Email delivery failed: ${error}`);
       }
     } else {
-      throw new Error("No email service configured");
+      throw new Error("No email service configured - RESEND_API_KEY required");
     }
   }
 

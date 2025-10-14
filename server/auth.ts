@@ -194,6 +194,179 @@ export function requireRole(roles: string[], apiKeyPermission?: string) {
 // Note: requireAPIKeyPermission is deprecated - use requireRole(roles, apiKeyPermission) instead
 // Centralized permission enforcement is now handled in requireRole() middleware
 
+// ==================== RATE LIMITING ====================
+
+// Rate limit configuration
+const RATE_LIMIT_CONFIG = {
+  login: { maxAttempts: 5, windowMinutes: 15, blockMinutes: 30 },
+  register: { maxAttempts: 3, windowMinutes: 60, blockMinutes: 60 },
+  passwordReset: { maxAttempts: 3, windowMinutes: 60, blockMinutes: 30 },
+  mfaVerify: { maxAttempts: 5, windowMinutes: 15, blockMinutes: 15 },
+};
+
+/**
+ * Rate limit middleware factory
+ * Usage: app.post("/api/auth/login", rateLimitByIP("login"), async (req, res) => {...})
+ */
+export function rateLimitByIP(action: keyof typeof RATE_LIMIT_CONFIG) {
+  return async (req: Request, res: Response, next: NextFunction) => {
+    const identifier = req.ip || req.socket.remoteAddress || "unknown";
+    await checkRateLimit(identifier, action, req, res, next);
+  };
+}
+
+/**
+ * Rate limit by email (for login/register)
+ */
+export function rateLimitByEmail(action: keyof typeof RATE_LIMIT_CONFIG) {
+  return async (req: Request, res: Response, next: NextFunction) => {
+    const identifier = req.body.email || "unknown";
+    await checkRateLimit(identifier, action, req, res, next);
+  };
+}
+
+/**
+ * Check if request should be rate limited (internal function)
+ * Returns error response if blocked, otherwise continues
+ */
+async function checkRateLimit(
+  identifier: string, // IP or email
+  action: keyof typeof RATE_LIMIT_CONFIG,
+  req: Request,
+  res: Response,
+  next: NextFunction
+) {
+  try {
+    const config = RATE_LIMIT_CONFIG[action];
+    const now = new Date();
+    
+    // Get existing rate limit record
+    const rateLimit = await storage.getRateLimit(identifier, action);
+    
+    // Check if currently blocked
+    if (rateLimit?.blockedUntil && now < new Date(rateLimit.blockedUntil)) {
+      const minutesRemaining = Math.ceil(
+        (new Date(rateLimit.blockedUntil).getTime() - now.getTime()) / 60000
+      );
+      return res.status(429).json({
+        error: "Too many attempts. Please try again later.",
+        retryAfter: minutesRemaining,
+        blockedUntil: rateLimit.blockedUntil,
+      });
+    }
+    
+    // Check if within rate limit window
+    if (rateLimit?.windowStart) {
+      const windowAge = (now.getTime() - new Date(rateLimit.windowStart).getTime()) / 60000;
+      
+      if (windowAge < config.windowMinutes) {
+        // Still within window - check attempt count
+        if (rateLimit.attempts >= config.maxAttempts) {
+          // Block the identifier
+          const blockedUntil = new Date(now.getTime() + config.blockMinutes * 60000);
+          await storage.updateRateLimit(identifier, action, {
+            blockedUntil,
+            attempts: rateLimit.attempts + 1,
+          });
+          
+          return res.status(429).json({
+            error: `Too many ${action} attempts. Account temporarily blocked.`,
+            retryAfter: config.blockMinutes,
+            blockedUntil,
+          });
+        }
+      } else {
+        // Window expired - reset attempts
+        await storage.updateRateLimit(identifier, action, {
+          attempts: 0,
+          windowStart: now,
+          blockedUntil: null,
+        });
+      }
+    }
+    
+    // Rate limit check passed
+    next();
+  } catch (error) {
+    console.error("Rate limit check error:", error);
+    // Don't block on rate limit errors - fail open for availability
+    next();
+  }
+}
+
+/**
+ * Record a failed attempt (e.g., wrong password)
+ */
+export async function recordFailedAttempt(
+  identifier: string,
+  action: keyof typeof RATE_LIMIT_CONFIG
+) {
+  try {
+    const config = RATE_LIMIT_CONFIG[action];
+    const now = new Date();
+    
+    const existing = await storage.getRateLimit(identifier, action);
+    
+    if (!existing) {
+      // Create new rate limit record
+      await storage.createRateLimit({
+        identifier,
+        action,
+        attempts: 1,
+        windowStart: now,
+      });
+    } else {
+      // Check if window expired
+      const windowAge = (now.getTime() - new Date(existing.windowStart).getTime()) / 60000;
+      
+      if (windowAge >= config.windowMinutes) {
+        // Reset window
+        await storage.updateRateLimit(identifier, action, {
+          attempts: 1,
+          windowStart: now,
+          blockedUntil: null,
+        });
+      } else {
+        // Increment attempts
+        const newAttempts = existing.attempts + 1;
+        const updates: any = { attempts: newAttempts };
+        
+        // Check if should block
+        if (newAttempts >= config.maxAttempts) {
+          updates.blockedUntil = new Date(now.getTime() + config.blockMinutes * 60000);
+        }
+        
+        await storage.updateRateLimit(identifier, action, updates);
+      }
+    }
+  } catch (error) {
+    console.error("Failed to record rate limit attempt:", error);
+  }
+}
+
+/**
+ * Reset rate limit on successful action (e.g., successful login)
+ */
+export async function resetRateLimit(
+  identifier: string,
+  action: keyof typeof RATE_LIMIT_CONFIG
+) {
+  try {
+    const existing = await storage.getRateLimit(identifier, action);
+    if (existing) {
+      await storage.updateRateLimit(identifier, action, {
+        attempts: 0,
+        windowStart: new Date(),
+        blockedUntil: null,
+      });
+    }
+  } catch (error) {
+    console.error("Failed to reset rate limit:", error);
+  }
+}
+
+// ==================== END RATE LIMITING ====================
+
 export async function auditLog(
   req: Request,
   action: string,

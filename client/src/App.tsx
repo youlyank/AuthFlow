@@ -17,6 +17,7 @@ import LoginPage from "@/pages/LoginPage";
 import RegisterPage from "@/pages/RegisterPage";
 import MfaVerifyPage from "@/pages/MfaVerifyPage";
 import ForgotPasswordPage from "@/pages/ForgotPasswordPage";
+import MagicLinkCallbackPage from "@/pages/MagicLinkCallbackPage";
 import SuperAdminDashboard from "@/pages/SuperAdminDashboard";
 import SuperAdminTenants from "@/pages/SuperAdminTenants";
 import SuperAdminPlans from "@/pages/SuperAdminPlans";
@@ -30,6 +31,7 @@ import WebhookManagement from "@/pages/WebhookManagement";
 import ApiKeyManagement from "@/pages/ApiKeyManagement";
 import OAuth2ConsentPage from "@/pages/OAuth2ConsentPage";
 import OAuth2ClientManagement from "@/pages/OAuth2ClientManagement";
+import IpRestrictionsPage from "@/pages/IpRestrictionsPage";
 import FeaturesDemoPage from "@/pages/FeaturesDemoPage";
 import ComparisonPage from "@/pages/ComparisonPage";
 import WhyAuthflowPage from "@/pages/WhyAuthflowPage";
@@ -129,6 +131,7 @@ function Router() {
       <Route path="/register" component={RegisterPage} />
       <Route path="/auth/mfa" component={MfaVerifyPage} />
       <Route path="/auth/forgot-password" component={ForgotPasswordPage} />
+      <Route path="/auth/magic-link" component={MagicLinkCallbackPage} />
 
       {/* Public marketing pages */}
       <Route path="/comparison" component={ComparisonPage} />
@@ -226,6 +229,14 @@ function Router() {
         <ProtectedRoute allowedRoles={["tenant_admin"]}>
           <DashboardLayout>
             <OAuth2ClientManagement />
+          </DashboardLayout>
+        </ProtectedRoute>
+      </Route>
+
+      <Route path="/admin/ip-restrictions">
+        <ProtectedRoute allowedRoles={["tenant_admin"]}>
+          <DashboardLayout>
+            <IpRestrictionsPage />
           </DashboardLayout>
         </ProtectedRoute>
       </Route>

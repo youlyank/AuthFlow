@@ -484,7 +484,7 @@ export class DbStorage implements IStorage {
       ));
     
     const totalRevenue = activePlans.reduce((sum, plan) => {
-      return sum + (parseFloat(plan.price) || 0);
+      return sum + (plan.price || 0);
     }, 0);
 
     return {
@@ -1247,6 +1247,50 @@ export class DbStorage implements IStorage {
       totalSecurityEvents: securityEventData.length,
       totalNewUsers: userGrowth.length,
     };
+  }
+
+  // =======================
+  // RATE LIMITING
+  // =======================
+
+  async getRateLimit(identifier: string, action: string): Promise<any> {
+    const [record] = await db
+      .select()
+      .from(rateLimits)
+      .where(
+        and(
+          eq(rateLimits.identifier, identifier),
+          eq(rateLimits.action, action)
+        )
+      )
+      .limit(1);
+    return record;
+  }
+
+  async createRateLimit(data: typeof rateLimits.$inferInsert): Promise<any> {
+    const [record] = await db
+      .insert(rateLimits)
+      .values(data)
+      .returning();
+    return record;
+  }
+
+  async updateRateLimit(
+    identifier: string,
+    action: string,
+    updates: Partial<typeof rateLimits.$inferInsert>
+  ): Promise<any> {
+    const [record] = await db
+      .update(rateLimits)
+      .set(updates)
+      .where(
+        and(
+          eq(rateLimits.identifier, identifier),
+          eq(rateLimits.action, action)
+        )
+      )
+      .returning();
+    return record;
   }
 }
 

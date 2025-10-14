@@ -15,9 +15,18 @@ import {
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 import { Logo } from "@/components/Logo";
 import { ThemeToggle } from "@/components/ThemeToggle";
-import { Eye, EyeOff, Mail, Lock, LogIn } from "lucide-react";
+import { Eye, EyeOff, Mail, Lock, LogIn, Wand2, Send } from "lucide-react";
 import { SiGoogle, SiGithub } from "react-icons/si";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -25,6 +34,8 @@ import { useToast } from "@/hooks/use-toast";
 export default function LoginPage() {
   const [, setLocation] = useLocation();
   const [showPassword, setShowPassword] = useState(false);
+  const [magicLinkDialogOpen, setMagicLinkDialogOpen] = useState(false);
+  const [magicLinkEmail, setMagicLinkEmail] = useState("");
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -64,6 +75,27 @@ export default function LoginPage() {
     window.location.href = `/api/auth/oauth/${provider}`;
   };
 
+  const magicLinkMutation = useMutation({
+    mutationFn: async (email: string) => {
+      return apiRequest("POST", "/api/auth/magic-link/request", { email }) as Promise<any>;
+    },
+    onSuccess: () => {
+      toast({
+        title: "Magic link sent!",
+        description: "Check your email for the sign-in link. It expires in 15 minutes.",
+      });
+      setMagicLinkDialogOpen(false);
+      setMagicLinkEmail("");
+    },
+    onError: (error: Error) => {
+      toast({
+        variant: "destructive",
+        title: "Failed to send magic link",
+        description: error.message || "Please try again later",
+      });
+    },
+  });
+
   return (
     <div className="min-h-screen flex items-center justify-center bg-background p-4">
       <div className="absolute top-4 right-4">
@@ -83,7 +115,7 @@ export default function LoginPage() {
           </div>
         </CardHeader>
         <CardContent className="space-y-6">
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-2 gap-3">
             <Button
               variant="outline"
               onClick={() => handleOAuthLogin("google")}
@@ -103,6 +135,60 @@ export default function LoginPage() {
               GitHub
             </Button>
           </div>
+
+          <Dialog open={magicLinkDialogOpen} onOpenChange={setMagicLinkDialogOpen}>
+            <DialogTrigger asChild>
+              <Button
+                variant="outline"
+                className="w-full hover-elevate active-elevate-2"
+                data-testid="button-magic-link"
+              >
+                <Wand2 className="mr-2 h-4 w-4" />
+                Sign in with Magic Link
+              </Button>
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Passwordless Sign In</DialogTitle>
+                <DialogDescription>
+                  Enter your email and we'll send you a secure sign-in link. No password needed!
+                </DialogDescription>
+              </DialogHeader>
+              <div className="space-y-4 py-4">
+                <div className="relative">
+                  <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    type="email"
+                    placeholder="name@company.com"
+                    value={magicLinkEmail}
+                    onChange={(e) => setMagicLinkEmail(e.target.value)}
+                    className="pl-10"
+                    data-testid="input-magic-link-email"
+                  />
+                </div>
+              </div>
+              <DialogFooter>
+                <Button
+                  onClick={() => magicLinkMutation.mutate(magicLinkEmail)}
+                  disabled={!magicLinkEmail || magicLinkMutation.isPending}
+                  className="w-full"
+                  data-testid="button-send-magic-link"
+                >
+                  {magicLinkMutation.isPending ? (
+                    <>
+                      <div className="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-primary-foreground border-t-transparent" />
+                      Sending...
+                    </>
+                  ) : (
+                    <>
+                      <Send className="mr-2 h-4 w-4" />
+                      Send Magic Link
+                    </>
+                  )}
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
 
           <div className="relative">
             <div className="absolute inset-0 flex items-center">

@@ -18,6 +18,10 @@ import {
   hashOAuth2Secret,
   verifyOAuth2Secret,
   generateAPIKey,
+  rateLimitByIP,
+  rateLimitByEmail,
+  recordFailedAttempt,
+  resetRateLimit,
 } from "./auth";
 import { generateWebhookSecret } from "./webhooks";
 import { loginSchema, registerSchema, mfaVerifySchema, createNotificationSchema, passwordResetRequestSchema, passwordResetSchema, updateTenantSettingsSchema } from "@shared/schema";
@@ -381,8 +385,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Register
-  app.post("/api/auth/register", async (req: Request, res: Response) => {
+  // Register (with rate limiting)
+  app.post("/api/auth/register", 
+    rateLimitByIP("register"), 
+    rateLimitByEmail("register"), 
+    async (req: Request, res: Response) => {
     try {
       const data = registerSchema.parse(req.body);
 
@@ -427,14 +434,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Login
-  app.post("/api/auth/login", async (req: Request, res: Response) => {
+  // Login (with rate limiting)
+  app.post("/api/auth/login", 
+    rateLimitByIP("login"), 
+    rateLimitByEmail("login"), 
+    async (req: Request, res: Response) => {
     try {
       const data = loginSchema.parse(req.body);
+      const ipAddress = req.ip || "unknown";
 
       // Find user
       const user = await storage.getUserByEmail(data.email);
       if (!user || !user.passwordHash) {
+        // Record failed attempt for both IP and email
+        await recordFailedAttempt(ipAddress, "login");
+        await recordFailedAttempt(data.email, "login");
+        
         await storage.createLoginHistory({
           email: data.email,
           success: false,
@@ -448,6 +463,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Verify password
       const isValid = await verifyPassword(data.password, user.passwordHash);
       if (!isValid) {
+        // Record failed attempt for both IP and email
+        await recordFailedAttempt(ipAddress, "login");
+        await recordFailedAttempt(data.email, "login");
+        
         await storage.createLoginHistory({
           userId: user.id,
           email: data.email,
@@ -492,6 +511,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         lastLoginAt: new Date(),
         lastLoginIp: req.ip,
       });
+
+      // Reset rate limits on successful login
+      await resetRateLimit(ipAddress, "login");
+      await resetRateLimit(data.email, "login");
 
       // Create login history
       await storage.createLoginHistory({
@@ -613,8 +636,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Password Reset Request
-  app.post("/api/auth/forgot-password", async (req: Request, res: Response) => {
+  // Password Reset Request (with rate limiting)
+  app.post("/api/auth/forgot-password",
+    rateLimitByIP("passwordReset"),
+    rateLimitByEmail("passwordReset"),
+    async (req: Request, res: Response) => {
     try {
       const data = passwordResetRequestSchema.parse(req.body);
 

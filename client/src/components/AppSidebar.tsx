@@ -36,6 +36,7 @@ import {
   History,
   Sparkles,
   Webhook,
+  Globe,
 } from "lucide-react";
 import { Logo } from "./Logo";
 import type { User } from "@shared/schema";
@@ -123,6 +124,11 @@ const tenantAdminItems = [
     title: "OAuth2 Clients",
     url: "/admin/oauth2-clients",
     icon: Shield,
+  },
+  {
+    title: "IP Restrictions",
+    url: "/admin/ip-restrictions",
+    icon: Globe,
   },
   {
     title: "Analytics",
