@@ -29,6 +29,12 @@ import { emailService } from "./email";
 import speakeasy from "speakeasy";
 import QRCode from "qrcode";
 import { randomBytes, createHash } from "crypto";
+import {
+  generateRegistrationOptions,
+  verifyRegistrationResponse,
+  generateAuthenticationOptions,
+  verifyAuthenticationResponse,
+} from "@simplewebauthn/server";
 
 // Device fingerprinting with better security
 function generateDeviceFingerprint(userId: string, userAgent: string, ip: string): string {
@@ -2723,6 +2729,285 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.error("Failed to auto-block IP:", error);
     }
   }
+
+  // =======================
+  // WEBAUTHN / PASSKEYS
+  // =======================
+  
+  // WebAuthn configuration
+  const rpName = 'Authflow';
+  const rpID = process.env.RP_ID || 'localhost'; // Replace with your domain in production
+  const origin = process.env.ORIGIN || 'http://localhost:5000'; // Replace with your URL
+
+  // Start WebAuthn Registration
+  app.post("/api/webauthn/register/start", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const user = await storage.getUser(req.user.id);
+      if (!user) {
+        return res.status(404).json({ error: "User not found" });
+      }
+
+      // Get existing credentials to exclude
+      const userCredentials = await storage.listWebauthnCredentials(req.user.id);
+      const excludeCredentials = userCredentials.map((cred: any) => ({
+        id: Buffer.from(cred.credentialId, 'base64'),
+        type: 'public-key' as const,
+        transports: ['usb', 'ble', 'nfc', 'internal'] as any[],
+      }));
+
+      const options = await generateRegistrationOptions({
+        rpName,
+        rpID,
+        userID: req.user.id,
+        userName: user.email,
+        attestationType: 'none',
+        excludeCredentials,
+        authenticatorSelection: {
+          residentKey: 'preferred',
+          userVerification: 'preferred',
+        },
+      });
+
+      // Store challenge in session for verification
+      req.session.webauthnChallenge = options.challenge;
+
+      res.json(options);
+    } catch (error: any) {
+      console.error("WebAuthn registration start error:", error);
+      res.status(500).json({ error: "Failed to start registration" });
+    }
+  });
+
+  // Verify WebAuthn Registration
+  app.post("/api/webauthn/register/verify", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const { response: credential, deviceName } = req.body;
+      
+      if (!req.session.webauthnChallenge) {
+        return res.status(400).json({ error: "No registration in progress" });
+      }
+
+      const expectedChallenge = req.session.webauthnChallenge;
+
+      const verification = await verifyRegistrationResponse({
+        response: credential,
+        expectedChallenge,
+        expectedOrigin: origin,
+        expectedRPID: rpID,
+      });
+
+      if (!verification.verified || !verification.registrationInfo) {
+        return res.status(400).json({ error: "Registration verification failed" });
+      }
+
+      const { credentialPublicKey, credentialID, counter } = verification.registrationInfo;
+
+      // Store credential
+      await storage.createWebauthnCredential({
+        userId: req.user.id,
+        credentialId: Buffer.from(credentialID).toString('base64'),
+        publicKey: Buffer.from(credentialPublicKey).toString('base64'),
+        counter,
+        deviceName: deviceName || 'Passkey',
+      });
+
+      // Clear challenge
+      delete req.session.webauthnChallenge;
+
+      await auditLog(req, "webauthn.registered", "user", req.user.id, { deviceName });
+
+      res.json({ verified: true, message: "Passkey registered successfully" });
+    } catch (error: any) {
+      console.error("WebAuthn registration verify error:", error);
+      res.status(500).json({ error: "Failed to verify registration" });
+    }
+  });
+
+  // Start WebAuthn Authentication
+  app.post("/api/webauthn/authenticate/start", async (req: Request, res: Response) => {
+    try {
+      const { email } = req.body;
+      
+      if (!email) {
+        return res.status(400).json({ error: "Email required" });
+      }
+
+      const user = await storage.getUserByEmail(email);
+      if (!user) {
+        return res.status(404).json({ error: "User not found" });
+      }
+
+      // Get user's credentials
+      const userCredentials = await storage.listWebauthnCredentials(user.id);
+      
+      if (userCredentials.length === 0) {
+        return res.status(400).json({ error: "No passkeys registered" });
+      }
+
+      const allowCredentials = userCredentials.map((cred: any) => ({
+        id: Buffer.from(cred.credentialId, 'base64'),
+        type: 'public-key' as const,
+        transports: ['usb', 'ble', 'nfc', 'internal'] as any[],
+      }));
+
+      const options = await generateAuthenticationOptions({
+        rpID,
+        allowCredentials,
+        userVerification: 'preferred',
+      });
+
+      // Store challenge and userId in session
+      req.session.webauthnChallenge = options.challenge;
+      req.session.webauthnUserId = user.id;
+
+      res.json(options);
+    } catch (error: any) {
+      console.error("WebAuthn authentication start error:", error);
+      res.status(500).json({ error: "Failed to start authentication" });
+    }
+  });
+
+  // Verify WebAuthn Authentication
+  app.post("/api/webauthn/authenticate/verify", async (req: Request, res: Response) => {
+    try {
+      const { response: credential } = req.body;
+
+      if (!req.session.webauthnChallenge || !req.session.webauthnUserId) {
+        return res.status(400).json({ error: "No authentication in progress" });
+      }
+
+      const expectedChallenge = req.session.webauthnChallenge;
+      const userId = req.session.webauthnUserId;
+
+      // Get the credential from database (credential.id comes from browser as base64url, convert to base64)
+      const credentialIdBase64 = Buffer.from(credential.id, 'base64url').toString('base64');
+      const dbCredential = await storage.getWebauthnCredentialByCredentialId(credentialIdBase64);
+      
+      if (!dbCredential || dbCredential.userId !== userId) {
+        return res.status(400).json({ error: "Invalid credential" });
+      }
+
+      const verification = await verifyAuthenticationResponse({
+        response: credential,
+        expectedChallenge,
+        expectedOrigin: origin,
+        expectedRPID: rpID,
+        authenticator: {
+          credentialID: Buffer.from(dbCredential.credentialId, 'base64'),
+          credentialPublicKey: Buffer.from(dbCredential.publicKey, 'base64'),
+          counter: dbCredential.counter,
+        },
+      });
+
+      if (!verification.verified) {
+        return res.status(400).json({ error: "Authentication verification failed" });
+      }
+
+      // Update counter
+      await storage.updateWebauthnCounter(
+        dbCredential.credentialId,
+        verification.authenticationInfo.newCounter
+      );
+
+      // Get user for token generation
+      const user = await storage.getUser(userId);
+      if (!user) {
+        return res.status(404).json({ error: "User not found" });
+      }
+
+      // Generate tokens
+      const token = generateToken({
+        userId: user.id,
+        email: user.email,
+        role: user.role,
+        tenantId: user.tenantId || undefined,
+      });
+      const refreshToken = generateRefreshToken();
+
+      // Create session
+      const expiresAt = new Date();
+      expiresAt.setDate(expiresAt.getDate() + 30);
+
+      await storage.createSession({
+        userId: user.id,
+        token,
+        refreshToken,
+        ipAddress: req.ip,
+        userAgent: req.headers["user-agent"],
+        expiresAt,
+      });
+
+      // Update last login
+      await storage.updateUser(user.id, {
+        lastLoginAt: new Date(),
+        lastLoginIp: req.ip,
+      });
+
+      // Create login history
+      await storage.createLoginHistory({
+        userId: user.id,
+        email: user.email,
+        success: true,
+        ipAddress: req.ip,
+        userAgent: req.headers["user-agent"],
+      });
+
+      // Clear session data
+      delete req.session.webauthnChallenge;
+      delete req.session.webauthnUserId;
+
+      await auditLog(req, "user.login", "user", user.id, { method: "webauthn" });
+
+      res.cookie("token", token, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === "production",
+        sameSite: "lax",
+        maxAge: 30 * 24 * 60 * 60 * 1000,
+      });
+
+      res.json({
+        verified: true,
+        user: {
+          id: user.id,
+          email: user.email,
+          firstName: user.firstName,
+          lastName: user.lastName,
+          role: user.role,
+          tenantId: user.tenantId,
+        },
+        token,
+      });
+    } catch (error: any) {
+      console.error("WebAuthn authentication verify error:", error);
+      res.status(500).json({ error: "Failed to verify authentication" });
+    }
+  });
+
+  // List user's WebAuthn credentials
+  app.get("/api/webauthn/credentials", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const credentials = await storage.listWebauthnCredentials(req.user.id);
+      res.json(credentials);
+    } catch (error: any) {
+      console.error("List credentials error:", error);
+      res.status(500).json({ error: "Failed to list credentials" });
+    }
+  });
+
+  // Delete WebAuthn credential
+  app.delete("/api/webauthn/credentials/:id", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const { id } = req.params;
+      await storage.deleteWebauthnCredential(id);
+
+      await auditLog(req, "webauthn.deleted", "user", req.user.id, { credentialId: id });
+
+      res.json({ message: "Passkey deleted successfully" });
+    } catch (error: any) {
+      console.error("Delete credential error:", error);
+      res.status(500).json({ error: "Failed to delete credential" });
+    }
+  });
 
   // =======================
   // IP RESTRICTIONS

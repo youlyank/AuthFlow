@@ -81,6 +81,13 @@ export interface IStorage {
   getMfaOtpToken(userId: string, code: string): Promise<any>;
   deleteMfaOtpToken(userId: string): Promise<void>;
   
+  // WebAuthn operations
+  createWebauthnCredential(credential: any): Promise<any>;
+  listWebauthnCredentials(userId: string): Promise<any[]>;
+  getWebauthnCredentialByCredentialId(credentialId: string): Promise<any | undefined>;
+  updateWebauthnCounter(credentialId: string, counter: number): Promise<void>;
+  deleteWebauthnCredential(id: string): Promise<void>;
+
   // Trusted device operations
   createTrustedDevice(device: any): Promise<any>;
   getTrustedDevice(userId: string, fingerprint: string): Promise<any>;
@@ -713,6 +720,40 @@ export class DbStorage implements IStorage {
 
   async deleteMfaOtpToken(userId: string): Promise<void> {
     await db.delete(mfaOtpTokens).where(eq(mfaOtpTokens.userId, userId));
+  }
+
+  // WebAuthn credential operations
+  async createWebauthnCredential(credential: any): Promise<any> {
+    const [newCredential] = await db.insert(webauthnCredentials).values(credential).returning();
+    return newCredential;
+  }
+
+  async listWebauthnCredentials(userId: string): Promise<any[]> {
+    return db
+      .select()
+      .from(webauthnCredentials)
+      .where(eq(webauthnCredentials.userId, userId))
+      .orderBy(desc(webauthnCredentials.createdAt));
+  }
+
+  async getWebauthnCredentialByCredentialId(credentialId: string): Promise<any | undefined> {
+    const [credential] = await db
+      .select()
+      .from(webauthnCredentials)
+      .where(eq(webauthnCredentials.credentialId, credentialId))
+      .limit(1);
+    return credential;
+  }
+
+  async updateWebauthnCounter(credentialId: string, counter: number): Promise<void> {
+    await db
+      .update(webauthnCredentials)
+      .set({ counter })
+      .where(eq(webauthnCredentials.credentialId, credentialId));
+  }
+
+  async deleteWebauthnCredential(id: string): Promise<void> {
+    await db.delete(webauthnCredentials).where(eq(webauthnCredentials.id, id));
   }
 
   async createTrustedDevice(device: any): Promise<any> {

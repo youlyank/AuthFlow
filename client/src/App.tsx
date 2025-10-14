@@ -27,6 +27,7 @@ import TenantAdminSessions from "@/pages/TenantAdminSessions";
 import TenantAdminSettings from "@/pages/TenantAdminSettings";
 import UserDashboard from "@/pages/UserDashboard";
 import SecuritySettings from "@/pages/SecuritySettings";
+import PasskeysPage from "@/pages/PasskeysPage";
 import WebhookManagement from "@/pages/WebhookManagement";
 import ApiKeyManagement from "@/pages/ApiKeyManagement";
 import OAuth2ConsentPage from "@/pages/OAuth2ConsentPage";
@@ -280,6 +281,14 @@ function Router() {
         <ProtectedRoute>
           <DashboardLayout>
             <SecuritySettings />
+          </DashboardLayout>
+        </ProtectedRoute>
+      </Route>
+
+      <Route path="/passkeys">
+        <ProtectedRoute>
+          <DashboardLayout>
+            <PasskeysPage />
           </DashboardLayout>
         </ProtectedRoute>
       </Route>

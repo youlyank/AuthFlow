@@ -176,6 +176,11 @@ const userItems = [
     icon: Shield,
   },
   {
+    title: "Passkeys",
+    url: "/passkeys",
+    icon: Fingerprint,
+  },
+  {
     title: "Settings",
     url: "/settings",
     icon: Settings,
