@@ -57,6 +57,11 @@ function validateRedirectUri(redirectUri: string, tenantCustomDomain?: string | 
       return true;
     }
     
+    // Allow subdomains of the request host (e.g., tenant.authflow.com if request from authflow.com)
+    if (requestHost && url.hostname.endsWith('.' + requestHost)) {
+      return true;
+    }
+    
     // Allow tenant's custom domain if provided
     if (tenantCustomDomain && url.hostname === tenantCustomDomain) {
       return true;
