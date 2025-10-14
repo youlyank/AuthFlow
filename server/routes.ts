@@ -2,6 +2,7 @@ import type { Express, Request, Response } from "express";
 import { createServer, type Server } from "http";
 import { Server as SocketIOServer } from "socket.io";
 import cookieParser from "cookie-parser";
+import "express-session"; // Import for type augmentation
 import { storage } from "./storage";
 import {
   hashPassword,
@@ -24,7 +25,7 @@ import {
   resetRateLimit,
 } from "./auth";
 import { generateWebhookSecret } from "./webhooks";
-import { loginSchema, registerSchema, mfaVerifySchema, createNotificationSchema, passwordResetRequestSchema, passwordResetSchema, updateTenantSettingsSchema } from "@shared/schema";
+import { loginSchema, registerSchema, mfaVerifySchema, createNotificationSchema, passwordResetRequestSchema, passwordResetSchema, updateTenantSettingsSchema, tenants } from "@shared/schema";
 import { emailService } from "./email";
 import speakeasy from "speakeasy";
 import QRCode from "qrcode";
@@ -51,12 +52,30 @@ function isTrustedDeviceExpired(lastSeenAt: Date | null, expiryDays: number = 30
   return (Date.now() - lastSeenAt.getTime()) > expiryMs;
 }
 
-// Type augmentation for Express Request
+// Type augmentation for Express Request and Session
 declare global {
   namespace Express {
     interface Request {
       user?: any;
     }
+  }
+}
+
+// Extend express-session's SessionData interface
+declare module 'express-session' {
+  interface SessionData {
+    mfaUserId?: string;
+    mfaVerified?: boolean;
+    tempMfaSecret?: { secret: string; backupCodes: string[] };
+    oauth2ConsentChallenge?: string;
+    oauth2ClientId?: string;
+    oauth2RedirectUri?: string;
+    oauth2Scope?: string;
+    oauth2CodeChallenge?: string;
+    oauth2CodeChallengeMethod?: string;
+    oauth2AuthRequest?: any;
+    webauthnChallenge?: string;
+    webauthnUserId?: string;
   }
 }
 
@@ -809,7 +828,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Create tenant
   app.post("/api/super-admin/tenants", requireAuth, requireRole(["super_admin"]), async (req: Request, res: Response) => {
     try {
-      const { name, slug, domain } = req.body;
+      const { name, slug, customDomain } = req.body;
       
       if (!name || !slug) {
         return res.status(400).json({ error: "Name and slug are required" });
@@ -818,7 +837,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const tenant = await storage.createTenant({
         name,
         slug,
-        domain: domain || null,
+        customDomain: customDomain || null,
       });
       
       await auditLog(req, "tenant.created", "tenant", tenant.id, { name, slug });
@@ -880,18 +899,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Create plan
   app.post("/api/super-admin/plans", requireAuth, requireRole(["super_admin"]), async (req: Request, res: Response) => {
     try {
-      const { name, price, currency, interval, features } = req.body;
+      const { name, price, type, maxUsers, features } = req.body;
       
-      if (!name || price === undefined) {
-        return res.status(400).json({ error: "Name and price are required" });
+      if (!name || price === undefined || !type || !maxUsers) {
+        return res.status(400).json({ error: "Name, price, type, and maxUsers are required" });
       }
       
       const plan = await storage.createPlan({
         name,
+        type,
+        maxUsers: parseInt(maxUsers),
         price: parseInt(price),
-        currency: currency || "USD",
-        interval: interval || "monthly",
-        features: features || {},
+        features: features || [],
       });
       
       await auditLog(req, "plan.created", "plan", plan.id, { name, price });
@@ -1254,11 +1273,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "Invalid verification code" });
       }
 
+      // Save backup codes before clearing session
+      const backupCodes = req.session.tempMfaSecret.backupCodes;
+
       // Save MFA secret to database
       await storage.createMfaSecret({
         userId: req.user.id,
         secret: req.session.tempMfaSecret.secret,
-        backupCodes: req.session.tempMfaSecret.backupCodes,
+        backupCodes,
       });
 
       // Enable MFA on user account
@@ -1274,7 +1296,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       res.json({ 
         message: "TOTP enabled successfully",
-        backupCodes: req.session.tempMfaSecret?.backupCodes 
+        backupCodes 
       });
     } catch (error: any) {
       console.error("Error verifying TOTP:", error);
@@ -2439,7 +2461,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       await storage.markMagicLinkAsUsed(magicLink.id);
 
       // Generate auth tokens
-      const jwtToken = generateToken(user);
+      const jwtToken = generateToken({
+        userId: user.id,
+        email: user.email,
+        role: user.role,
+        tenantId: user.tenantId || undefined,
+      });
       const refreshToken = generateRefreshToken();
 
       // Create session
@@ -2750,8 +2777,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Get existing credentials to exclude
       const userCredentials = await storage.listWebauthnCredentials(req.user.id);
       const excludeCredentials = userCredentials.map((cred: any) => ({
-        id: Buffer.from(cred.credentialId, 'base64'),
-        type: 'public-key' as const,
+        id: cred.credentialId, // Already a base64 string, SimpleWebAuthn will handle conversion
         transports: ['usb', 'ble', 'nfc', 'internal'] as any[],
       }));
 
@@ -2781,16 +2807,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Verify WebAuthn Registration
   app.post("/api/webauthn/register/verify", requireAuth, async (req: Request, res: Response) => {
     try {
-      const { response: credential, deviceName } = req.body;
+      const { response: credentialResponse, deviceName } = req.body;
       
-      if (!req.session.webauthnChallenge) {
+      if (!req.session?.webauthnChallenge) {
         return res.status(400).json({ error: "No registration in progress" });
       }
 
       const expectedChallenge = req.session.webauthnChallenge;
 
       const verification = await verifyRegistrationResponse({
-        response: credential,
+        response: credentialResponse,
         expectedChallenge,
         expectedOrigin: origin,
         expectedRPID: rpID,
@@ -2800,7 +2826,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "Registration verification failed" });
       }
 
-      const { credentialPublicKey, credentialID, counter } = verification.registrationInfo;
+      const { credential, credentialBackedUp, credentialDeviceType } = verification.registrationInfo;
+      const credentialPublicKey = credential.publicKey;
+      const credentialID = credential.id;
+      const counter = credential.counter;
 
       // Store credential
       await storage.createWebauthnCredential({
@@ -2845,8 +2874,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const allowCredentials = userCredentials.map((cred: any) => ({
-        id: Buffer.from(cred.credentialId, 'base64'),
-        type: 'public-key' as const,
+        id: cred.credentialId, // Already a base64 string, SimpleWebAuthn will handle conversion
         transports: ['usb', 'ble', 'nfc', 'internal'] as any[],
       }));
 
@@ -2892,9 +2920,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         expectedChallenge,
         expectedOrigin: origin,
         expectedRPID: rpID,
-        authenticator: {
-          credentialID: Buffer.from(dbCredential.credentialId, 'base64'),
-          credentialPublicKey: Buffer.from(dbCredential.publicKey, 'base64'),
+        credential: {
+          id: dbCredential.credentialId, // Already base64 string
+          publicKey: Buffer.from(dbCredential.publicKey, 'base64'),
           counter: dbCredential.counter,
         },
       });
