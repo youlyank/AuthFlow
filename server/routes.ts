@@ -26,6 +26,7 @@ import {
 } from "./auth";
 import { generateWebhookSecret } from "./webhooks";
 import { loginSchema, registerSchema, mfaVerifySchema, createNotificationSchema, passwordResetRequestSchema, passwordResetSchema, updateTenantSettingsSchema, tenants } from "@shared/schema";
+import downloadRoutes from "./download-routes";
 import { emailService } from "./email";
 import speakeasy from "speakeasy";
 import QRCode from "qrcode";
@@ -3373,6 +3374,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({ error: "Failed to get analytics" });
     }
   });
+
+  // =======================
+  // DOWNLOAD/EXPORT ROUTES
+  // =======================
+  app.use("/api", downloadRoutes);
 
   return httpServer;
 }
