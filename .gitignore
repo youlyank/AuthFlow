@@ -4,3 +4,19 @@ dist
 server/public
 vite.config.ts.*
 *.tar.gz
+
+# Security - Sensitive files
+.keys/
+*.pem
+*.key
+
+# Database backups and exports
+authflow_download_package/
+*.sql
+*_backup.sql
+*_export*.json
+
+# Environment and secrets
+.env
+.env.local
+.env.*.local
