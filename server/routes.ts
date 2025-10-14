@@ -860,19 +860,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Password Reset with Code
-  app.post("/api/auth/reset-password", async (req: Request, res: Response) => {
+  app.post("/api/auth/reset-password", 
+    rateLimitByIP("passwordResetComplete"),
+    async (req: Request, res: Response) => {
     try {
       const { email, code, newPassword } = req.body;
+      const ipAddress = req.ip || req.socket.remoteAddress || "unknown";
 
       const user = await storage.getUserByEmail(email);
       if (!user) {
+        // Record failed attempt - user not found
+        await recordFailedAttempt(ipAddress, "passwordResetComplete");
         return res.status(400).json({ error: "Invalid request" });
       }
 
       const resetToken = await storage.getPasswordResetToken(user.id, code);
       if (!resetToken || resetToken.expiresAt < new Date()) {
+        // Record failed attempt - invalid/expired token
+        await recordFailedAttempt(ipAddress, "passwordResetComplete");
         return res.status(400).json({ error: "Invalid or expired code" });
       }
+
+      // Reset rate limit on success
+      await resetRateLimit(ipAddress, "passwordResetComplete");
 
       // Update password
       const passwordHash = await hashPassword(newPassword);
@@ -891,19 +901,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Email Verification
-  app.post("/api/auth/verify-email", async (req: Request, res: Response) => {
+  app.post("/api/auth/verify-email", 
+    rateLimitByIP("emailVerify"),
+    async (req: Request, res: Response) => {
     try {
       const { email, code } = req.body;
+      const ipAddress = req.ip || req.socket.remoteAddress || "unknown";
 
       const user = await storage.getUserByEmail(email);
       if (!user) {
+        // Record failed attempt - user not found
+        await recordFailedAttempt(ipAddress, "emailVerify");
         return res.status(400).json({ error: "Invalid request" });
       }
 
       const verificationToken = await storage.getEmailVerificationToken(user.id, code);
       if (!verificationToken || verificationToken.expiresAt < new Date()) {
+        // Record failed attempt - invalid/expired token
+        await recordFailedAttempt(ipAddress, "emailVerify");
         return res.status(400).json({ error: "Invalid or expired code" });
       }
+
+      // Reset rate limit on success
+      await resetRateLimit(ipAddress, "emailVerify");
 
       // Mark email as verified
       await storage.updateUser(user.id, { emailVerified: true });
@@ -921,7 +941,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Resend Verification Code
-  app.post("/api/auth/resend-verification", async (req: Request, res: Response) => {
+  app.post("/api/auth/resend-verification", 
+    rateLimitByIP("resendVerification"),
+    rateLimitByEmail("resendVerification"),
+    async (req: Request, res: Response) => {
     try {
       const { email } = req.body;
 
@@ -1385,11 +1408,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Verify and enable TOTP
-  app.post("/api/user/mfa/totp/verify", requireAuth, async (req: Request, res: Response) => {
+  app.post("/api/user/mfa/totp/verify", 
+    rateLimitByIP("mfaVerify"),
+    requireAuth, 
+    async (req: Request, res: Response) => {
     try {
       const { token } = req.body;
+      const ipAddress = req.ip || req.socket.remoteAddress || "unknown";
 
       if (!req.session.tempMfaSecret) {
+        // Record failed attempt - no setup in progress
+        await recordFailedAttempt(ipAddress, "mfaVerify");
         return res.status(400).json({ error: "No MFA setup in progress" });
       }
 
@@ -1401,8 +1430,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
 
       if (!verified) {
+        // Record failed MFA attempt - invalid code
+        await recordFailedAttempt(ipAddress, "mfaVerify");
         return res.status(400).json({ error: "Invalid verification code" });
       }
+
+      // Reset rate limit on success
+      await resetRateLimit(ipAddress, "mfaVerify");
 
       // Save backup codes before clearing session
       const backupCodes = req.session.tempMfaSecret.backupCodes;
@@ -1510,19 +1544,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Verify Email OTP and complete setup
-  app.post("/api/user/mfa/email/verify", requireAuth, async (req: Request, res: Response) => {
+  app.post("/api/user/mfa/email/verify", 
+    rateLimitByIP("mfaVerify"),
+    requireAuth, 
+    async (req: Request, res: Response) => {
     try {
       const { code, rememberDevice } = req.body;
+      const ipAddress = req.ip || req.socket.remoteAddress || "unknown";
 
       if (!code) {
+        // Record failed attempt - missing code
+        await recordFailedAttempt(ipAddress, "mfaVerify");
         return res.status(400).json({ error: "Code required" });
       }
 
       // Verify OTP
       const token = await storage.getMfaOtpToken(req.user.id, code);
       if (!token) {
+        // Record failed MFA attempt - invalid code
+        await recordFailedAttempt(ipAddress, "mfaVerify");
         return res.status(401).json({ error: "Invalid or expired code" });
       }
+
+      // Reset rate limit on success
+      await resetRateLimit(ipAddress, "mfaVerify");
 
       // Enable MFA on user account
       await storage.updateUser(req.user.id, {
@@ -2522,7 +2567,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // =======================
   
   // Request Magic Link
-  app.post("/api/auth/magic-link/request", async (req: Request, res: Response) => {
+  app.post("/api/auth/magic-link/request", 
+    rateLimitByIP("magicLinkRequest"),
+    rateLimitByEmail("magicLinkRequest"),
+    async (req: Request, res: Response) => {
     try {
       const { email, tenantSlug } = req.body;
 
@@ -2575,23 +2623,36 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Verify Magic Link
-  app.post("/api/auth/magic-link/verify", async (req: Request, res: Response) => {
+  app.post("/api/auth/magic-link/verify", 
+    rateLimitByIP("magicLinkVerify"),
+    async (req: Request, res: Response) => {
     try {
       const { token } = req.body;
 
       const magicLink = await storage.getMagicLinkToken(token);
+      const ipAddress = req.ip || req.socket.remoteAddress || "unknown";
+      
       if (!magicLink || magicLink.usedAt) {
+        // Record failed attempt
+        await recordFailedAttempt(ipAddress, "magicLinkVerify");
         return res.status(400).json({ error: "Invalid or expired magic link" });
       }
 
       if (new Date() > magicLink.expiresAt) {
+        // Record failed attempt
+        await recordFailedAttempt(ipAddress, "magicLinkVerify");
         return res.status(400).json({ error: "Magic link has expired" });
       }
 
       const user = await storage.getUser(magicLink.userId!);
       if (!user) {
+        // Record failed attempt
+        await recordFailedAttempt(ipAddress, "magicLinkVerify");
         return res.status(404).json({ error: "User not found" });
       }
+
+      // Reset rate limit on success
+      await resetRateLimit(ipAddress, "magicLinkVerify");
 
       // Mark magic link as used
       await storage.markMagicLinkAsUsed(magicLink.id);
