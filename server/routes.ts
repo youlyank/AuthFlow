@@ -547,7 +547,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Get current user
   app.get("/api/auth/me", requireAuth, async (req: Request, res: Response) => {
-    res.json({ user: req.user });
+    // Safely serialize user without sensitive fields
+    const { passwordHash, ...safeUser } = req.user;
+    res.json({ user: safeUser });
   });
 
   // ===== Super Admin Routes =====
