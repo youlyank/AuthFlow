@@ -31,6 +31,8 @@ import ApiKeyManagement from "@/pages/ApiKeyManagement";
 import OAuth2ConsentPage from "@/pages/OAuth2ConsentPage";
 import OAuth2ClientManagement from "@/pages/OAuth2ClientManagement";
 import FeaturesDemoPage from "@/pages/FeaturesDemoPage";
+import ComparisonPage from "@/pages/ComparisonPage";
+import WhyAuthflowPage from "@/pages/WhyAuthflowPage";
 
 function ProtectedRoute({ children, allowedRoles }: { children: React.ReactNode; allowedRoles?: string[] }) {
   const { user, isLoading } = useAuth();
@@ -127,6 +129,10 @@ function Router() {
       <Route path="/register" component={RegisterPage} />
       <Route path="/auth/mfa" component={MfaVerifyPage} />
       <Route path="/auth/forgot-password" component={ForgotPasswordPage} />
+
+      {/* Public marketing pages */}
+      <Route path="/comparison" component={ComparisonPage} />
+      <Route path="/why-authflow" component={WhyAuthflowPage} />
 
       {/* OAuth2 Consent */}
       <Route path="/oauth2/consent">

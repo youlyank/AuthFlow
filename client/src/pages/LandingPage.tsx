@@ -40,6 +40,12 @@ export default function LandingPage() {
               <span className="text-2xl font-bold">Authflow</span>
             </div>
             <div className="flex items-center gap-4">
+              <Link href="/comparison">
+                <Button variant="ghost" data-testid="link-comparison">Compare</Button>
+              </Link>
+              <Link href="/why-authflow">
+                <Button variant="ghost" data-testid="link-why-authflow">Why Us</Button>
+              </Link>
               <Link href="/login">
                 <Button variant="ghost" data-testid="button-login">Login</Button>
               </Link>
