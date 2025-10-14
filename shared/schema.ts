@@ -140,6 +140,8 @@ export const users = pgTable(
     firstName: text("first_name"),
     lastName: text("last_name"),
     avatarUrl: text("avatar_url"),
+    phoneNumber: text("phone_number"),
+    phoneVerified: boolean("phone_verified").notNull().default(false),
     role: roleEnum("role").notNull().default("user"),
     isActive: boolean("is_active").notNull().default(true),
     emailVerified: boolean("email_verified").notNull().default(false),

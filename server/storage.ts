@@ -1,5 +1,5 @@
 import { db } from "./db";
-import { eq, and, desc, count, sql, lt } from "drizzle-orm";
+import { eq, and, desc, count, sql, lt, gt } from "drizzle-orm";
 import {
   users,
   tenants,

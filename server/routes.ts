@@ -1788,6 +1788,235 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ===== SMS OTP MFA Routes =====
+
+  // Add/Update phone number
+  app.post("/api/user/phone/update", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const { phoneNumber } = req.body;
+
+      if (!phoneNumber) {
+        return res.status(400).json({ error: "Phone number required" });
+      }
+
+      // Update user phone number
+      await storage.updateUser(req.user.id, {
+        phoneNumber,
+        phoneVerified: false,
+      });
+
+      await auditLog(req, "phone.updated", "user", req.user.id, { phoneNumber });
+
+      res.json({ message: "Phone number updated successfully" });
+    } catch (error: any) {
+      console.error("Error updating phone number:", error);
+      res.status(500).json({ error: "Failed to update phone number" });
+    }
+  });
+
+  // Enable SMS OTP MFA and send initial code
+  app.post("/api/user/mfa/sms/enable", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const { sendSMSCode, isSMSConfigured } = await import("./sms");
+      
+      if (!isSMSConfigured()) {
+        return res.status(503).json({ 
+          error: "SMS service not configured. Please add TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, and TWILIO_PHONE_NUMBER to your environment." 
+        });
+      }
+
+      const user = await storage.getUser(req.user.id);
+      if (!user) {
+        return res.status(404).json({ error: "User not found" });
+      }
+
+      if (!user.phoneNumber) {
+        return res.status(400).json({ error: "Phone number required. Please add a phone number first." });
+      }
+
+      // Generate OTP code
+      const { emailService } = await import("./email");
+      const code = emailService.generateOTP(6);
+      const expiresAt = new Date();
+      expiresAt.setMinutes(expiresAt.getMinutes() + 10);
+
+      // Delete old tokens
+      await storage.deleteMfaOtpToken(req.user.id);
+
+      // Create new OTP token
+      await storage.createMfaOtpToken({
+        userId: req.user.id,
+        code,
+        expiresAt,
+      });
+
+      // Send OTP code via SMS
+      const sent = await sendSMSCode(user.phoneNumber, code);
+      if (!sent) {
+        return res.status(500).json({ error: "Failed to send SMS code" });
+      }
+
+      await auditLog(req, "mfa.sms_setup_initiated", "user", req.user.id, {});
+
+      res.json({ message: "OTP sent to your phone" });
+    } catch (error: any) {
+      console.error("Error enabling SMS OTP:", error);
+      res.status(500).json({ error: "Failed to enable SMS OTP" });
+    }
+  });
+
+  // Verify SMS OTP and complete setup
+  app.post("/api/user/mfa/sms/verify",
+    rateLimitByIP("mfaVerify"),
+    requireAuth,
+    async (req: Request, res: Response) => {
+    try {
+      const { code, rememberDevice } = req.body;
+      const ipAddress = req.ip || req.socket.remoteAddress || "unknown";
+
+      if (!code) {
+        await recordFailedAttempt(ipAddress, "mfaVerify");
+        return res.status(400).json({ error: "Code required" });
+      }
+
+      // Verify OTP
+      const token = await storage.getMfaOtpToken(req.user.id, code);
+      if (!token) {
+        await recordFailedAttempt(ipAddress, "mfaVerify");
+        return res.status(401).json({ error: "Invalid or expired code" });
+      }
+
+      await resetRateLimit(ipAddress, "mfaVerify");
+
+      // Enable MFA on user account
+      await storage.updateUser(req.user.id, {
+        mfaEnabled: true,
+        mfaMethod: "sms",
+        phoneVerified: true,
+      });
+
+      // Delete used token
+      await storage.deleteMfaOtpToken(req.user.id);
+
+      // Remember device if requested
+      if (rememberDevice) {
+        const userAgent = req.headers["user-agent"] || "Unknown";
+        const deviceFingerprint = generateDeviceFingerprint(req.user.id, userAgent, req.ip || "");
+        
+        await storage.createTrustedDevice({
+          userId: req.user.id,
+          fingerprint: deviceFingerprint,
+          deviceName: userAgent.substring(0, 100),
+          isTrusted: true,
+        });
+      }
+
+      await auditLog(req, "mfa.enabled", "user", req.user.id, { method: "sms", rememberDevice });
+
+      res.json({ message: "SMS OTP enabled successfully" });
+    } catch (error: any) {
+      console.error("Error verifying SMS OTP:", error);
+      res.status(500).json({ error: "Failed to verify SMS OTP" });
+    }
+  });
+
+  // Send SMS OTP code (checks trusted devices first)
+  app.post("/api/user/mfa/sms/send", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const { sendSMSCode } = await import("./sms");
+      
+      const user = await storage.getUser(req.user.id);
+      if (!user || !user.phoneNumber) {
+        return res.status(404).json({ error: "User or phone number not found" });
+      }
+
+      // Check if device is trusted
+      const userAgent = req.headers["user-agent"] || "Unknown";
+      const deviceFingerprint = generateDeviceFingerprint(req.user.id, userAgent, req.ip || "");
+      const trustedDevice = await storage.getTrustedDevice(req.user.id, deviceFingerprint);
+
+      if (trustedDevice && trustedDevice.isTrusted) {
+        if (isTrustedDeviceExpired(trustedDevice.lastSeenAt)) {
+          await storage.deleteTrustedDevice(trustedDevice.id);
+        } else {
+          await storage.updateTrustedDeviceLastSeen(req.user.id, deviceFingerprint);
+          return res.json({ message: "Trusted device - OTP not required", trusted: true });
+        }
+      }
+
+      // Generate OTP code
+      const { emailService } = await import("./email");
+      const code = emailService.generateOTP(6);
+      const expiresAt = new Date();
+      expiresAt.setMinutes(expiresAt.getMinutes() + 10);
+
+      // Delete old tokens
+      await storage.deleteMfaOtpToken(req.user.id);
+
+      // Create new OTP token
+      await storage.createMfaOtpToken({
+        userId: req.user.id,
+        code,
+        expiresAt,
+      });
+
+      // Send OTP code via SMS
+      const sent = await sendSMSCode(user.phoneNumber, code);
+      if (!sent) {
+        return res.status(500).json({ error: "Failed to send SMS code" });
+      }
+
+      res.json({ message: "OTP sent to your phone", trusted: false });
+    } catch (error: any) {
+      console.error("Error sending SMS OTP:", error);
+      res.status(500).json({ error: "Failed to send SMS OTP" });
+    }
+  });
+
+  // Disable SMS OTP MFA
+  app.post("/api/user/mfa/sms/disable", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const { password } = req.body;
+
+      if (!password) {
+        return res.status(400).json({ error: "Password required" });
+      }
+
+      // Verify password
+      const user = await storage.getUser(req.user.id);
+      if (!user || !user.passwordHash) {
+        return res.status(400).json({ error: "Invalid request" });
+      }
+
+      const validPassword = await verifyPassword(password, user.passwordHash);
+      if (!validPassword) {
+        return res.status(401).json({ error: "Invalid password" });
+      }
+
+      // Disable MFA
+      await storage.updateUser(req.user.id, {
+        mfaEnabled: false,
+        mfaMethod: null,
+      });
+
+      // Delete any pending OTP tokens
+      await storage.deleteMfaOtpToken(req.user.id);
+      
+      // Remove all trusted devices for this user
+      const trustedDevices = await storage.listTrustedDevices(req.user.id);
+      for (const device of trustedDevices) {
+        await storage.deleteTrustedDevice(device.id);
+      }
+
+      await auditLog(req, "mfa.disabled", "user", req.user.id, {});
+
+      res.json({ message: "SMS OTP disabled successfully" });
+    } catch (error: any) {
+      console.error("Error disabling SMS OTP:", error);
+      res.status(500).json({ error: "Failed to disable SMS OTP" });
+    }
+  });
+
   // ===== Trusted Devices Routes =====
 
   // List user's trusted devices
@@ -3617,6 +3846,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({ error: "Failed to get analytics" });
     }
   });
+
+  // =======================
+  // API DOCUMENTATION
+  // =======================
+  const swaggerUi = await import("swagger-ui-express");
+  const { swaggerDocument } = await import("./swagger");
+  
+  app.use("/api-docs", swaggerUi.default.serve);
+  app.get("/api-docs", swaggerUi.default.setup(swaggerDocument, {
+    customSiteTitle: "AuthFlow API Documentation",
+    customCss: ".swagger-ui .topbar { display: none }",
+  }));
 
   // =======================
   // DOWNLOAD/EXPORT ROUTES

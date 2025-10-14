@@ -1,0 +1,24 @@
+{
+  "name": "authflow/authflow-php",
+  "description": "Official PHP SDK for AuthFlow authentication platform",
+  "type": "library",
+  "keywords": ["authentication", "auth", "oauth", "mfa", "webauthn", "authflow"],
+  "license": "MIT",
+  "authors": [
+    {
+      "name": "AuthFlow Team",
+      "email": "support@authflow.com"
+    }
+  ],
+  "require": {
+    "php": ">=7.4",
+    "ext-curl": "*",
+    "ext-json": "*"
+  },
+  "autoload": {
+    "psr-4": {
+      "Authflow\\": "src/"
+    }
+  },
+  "minimum-stability": "stable"
+}

@@ -8,7 +8,8 @@ export interface AuthflowConfig {
 export interface User {
   id: string;
   email: string;
-  name?: string;
+  firstName?: string;
+  lastName?: string;
   role: 'super_admin' | 'tenant_admin' | 'user';
   tenantId?: string;
   emailVerified: boolean;
@@ -33,7 +34,8 @@ export interface LoginCredentials {
 export interface RegisterData {
   email: string;
   password: string;
-  name?: string;
+  firstName: string;
+  lastName: string;
   tenantSlug?: string;
 }
 
