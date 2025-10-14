@@ -37,6 +37,39 @@ import {
   verifyAuthenticationResponse,
 } from "@simplewebauthn/server";
 
+// Validate redirect URI to prevent open redirect vulnerability
+function validateRedirectUri(redirectUri: string, tenantCustomDomain?: string | null, requestHost?: string): boolean {
+  try {
+    const url = new URL(redirectUri);
+    
+    // Only allow http/https protocols (reject javascript:, data:, etc.)
+    if (!['http:', 'https:'].includes(url.protocol)) {
+      return false;
+    }
+    
+    // Allow localhost for development
+    if (url.hostname === 'localhost' || url.hostname === '127.0.0.1') {
+      return true;
+    }
+    
+    // Allow same origin as the request (e.g., authflow.com if request from authflow.com)
+    if (requestHost && url.hostname === requestHost) {
+      return true;
+    }
+    
+    // Allow tenant's custom domain if provided
+    if (tenantCustomDomain && url.hostname === tenantCustomDomain) {
+      return true;
+    }
+    
+    // SECURITY: Reject everything else (no arbitrary external domains)
+    return false;
+  } catch {
+    // Invalid URL
+    return false;
+  }
+}
+
 // Device fingerprinting with better security
 function generateDeviceFingerprint(userId: string, userAgent: string, ip: string): string {
   // Create deterministic but secure fingerprint using configurable salt
@@ -162,6 +195,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // OAuth Routes
   app.get("/api/auth/oauth/:provider", async (req: Request, res: Response) => {
     const { provider } = req.params;
+    const { tenant: tenantSlug } = req.query;
+    
+    // Check tenant settings if specified
+    if (tenantSlug && typeof tenantSlug === "string") {
+      const tenant = await storage.getTenantBySlug(tenantSlug);
+      if (!tenant || !tenant.isActive) {
+        return res.redirect("/auth/login?error=invalid_tenant");
+      }
+      if (!tenant.allowSocialAuth) {
+        return res.redirect("/auth/login?error=social_auth_disabled");
+      }
+      // Store tenant slug for callback
+      res.cookie("oauth_tenant", tenantSlug, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === "production",
+        maxAge: 10 * 60 * 1000, // 10 minutes
+        sameSite: "lax",
+      });
+    }
     
     // Generate CSRF state token
     const state = generateRefreshToken(); // Cryptographically strong random token
@@ -410,6 +462,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Public endpoint to get tenant branding by slug (for Universal Login)
+  app.get("/api/public/tenant/:slug", async (req: Request, res: Response) => {
+    try {
+      const { slug } = req.params;
+      
+      const tenant = await storage.getTenantBySlug(slug);
+      if (!tenant || !tenant.isActive) {
+        return res.status(404).json({ error: "Tenant not found" });
+      }
+
+      // Return only public branding information
+      res.json({
+        id: tenant.id,
+        name: tenant.name,
+        slug: tenant.slug,
+        logoUrl: tenant.logoUrl,
+        primaryColor: tenant.primaryColor,
+        customDomain: tenant.customDomain,
+        allowPasswordAuth: tenant.allowPasswordAuth,
+        allowSocialAuth: tenant.allowSocialAuth,
+        allowMagicLink: tenant.allowMagicLink,
+        requireEmailVerification: tenant.requireEmailVerification,
+      });
+    } catch (error: any) {
+      console.error("Error fetching tenant branding:", error);
+      res.status(500).json({ error: "Failed to fetch tenant branding" });
+    }
+  });
+
   // Register (with rate limiting)
   app.post("/api/auth/register", 
     rateLimitByIP("register"), 
@@ -417,11 +498,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
     async (req: Request, res: Response) => {
     try {
       const data = registerSchema.parse(req.body);
+      const { tenantSlug } = req.body;
 
       // Check if user exists
       const existing = await storage.getUserByEmail(data.email);
       if (existing) {
         return res.status(400).json({ error: "User already exists" });
+      }
+
+      // Get tenant ID from slug if provided
+      let tenantId = null;
+      if (tenantSlug) {
+        const tenant = await storage.getTenantBySlug(tenantSlug);
+        if (!tenant || !tenant.isActive) {
+          return res.status(400).json({ error: "Invalid tenant" });
+        }
+        // Enforce tenant auth settings
+        if (!tenant.allowPasswordAuth) {
+          return res.status(403).json({ error: "Password authentication is disabled for this tenant" });
+        }
+        tenantId = tenant.id;
       }
 
       // Hash password and create user
@@ -432,7 +528,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         firstName: data.firstName,
         lastName: data.lastName,
         role: "user",
-        tenantId: null, // Will be set based on tenant slug if provided
+        tenantId,
       });
 
       // Generate verification code
@@ -466,7 +562,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
     async (req: Request, res: Response) => {
     try {
       const data = loginSchema.parse(req.body);
+      const { tenantSlug, redirectUri } = req.body;
       const ipAddress = req.ip || "unknown";
+      
+      // Validate redirect URI if provided
+      let validatedRedirectUri: string | null = null;
+      if (redirectUri && typeof redirectUri === 'string') {
+        const tenant = tenantSlug ? await storage.getTenantBySlug(tenantSlug) : null;
+        if (validateRedirectUri(redirectUri, tenant?.customDomain, req.get('host'))) {
+          validatedRedirectUri = redirectUri;
+        }
+      }
 
       // Find user
       const user = await storage.getUserByEmail(data.email);
@@ -483,6 +589,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
           failureReason: "Invalid credentials",
         });
         return res.status(401).json({ error: "Invalid credentials" });
+      }
+
+      // Verify tenant if specified
+      if (tenantSlug) {
+        const tenant = await storage.getTenantBySlug(tenantSlug);
+        if (!tenant || !tenant.isActive) {
+          return res.status(401).json({ error: "Invalid tenant" });
+        }
+        if (user.tenantId !== tenant.id) {
+          return res.status(401).json({ error: "User does not belong to this tenant" });
+        }
+        // Enforce tenant auth settings
+        if (!tenant.allowPasswordAuth) {
+          return res.status(403).json({ error: "Password authentication is disabled for this tenant" });
+        }
       }
 
       // Verify password
@@ -537,7 +658,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Check if MFA is enabled
       if (user.mfaEnabled) {
         // In a real implementation, store the userId in session for MFA verification
-        return res.json({ requiresMfa: true });
+        return res.json({ 
+          requiresMfa: true,
+          redirectUri: validatedRedirectUri 
+        });
       }
 
       // Generate tokens
@@ -598,6 +722,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           tenantId: user.tenantId,
         },
         token,
+        redirectUri: validatedRedirectUri,
       });
     } catch (error: any) {
       console.error("Login error:", error);
@@ -2407,6 +2532,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.json({ message: "If the email exists, a magic link has been sent" });
       }
 
+      // Enforce tenant auth settings
+      if (!tenant.allowMagicLink) {
+        return res.status(403).json({ error: "Magic link authentication is disabled for this tenant" });
+      }
+
       // Find user within tenant scope ONLY
       const user = await storage.getUserByEmail(email, tenant.id);
       if (!user) {
@@ -2898,10 +3028,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Verify WebAuthn Authentication
   app.post("/api/webauthn/authenticate/verify", async (req: Request, res: Response) => {
     try {
-      const { response: credential } = req.body;
+      const { response: credential, tenantSlug, redirectUri } = req.body;
 
       if (!req.session.webauthnChallenge || !req.session.webauthnUserId) {
         return res.status(400).json({ error: "No authentication in progress" });
+      }
+
+      // Validate redirect URI if provided
+      let validatedRedirectUri: string | null = null;
+      if (redirectUri && typeof redirectUri === 'string') {
+        const tenant = tenantSlug ? await storage.getTenantBySlug(tenantSlug) : null;
+        if (validateRedirectUri(redirectUri, tenant?.customDomain, req.get('host'))) {
+          validatedRedirectUri = redirectUri;
+        }
       }
 
       const expectedChallenge = req.session.webauthnChallenge;
@@ -3004,6 +3143,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           tenantId: user.tenantId,
         },
         token,
+        redirectUri: validatedRedirectUri,
       });
     } catch (error: any) {
       console.error("WebAuthn authentication verify error:", error);

@@ -39,6 +39,7 @@ import {
   Globe,
   AlertTriangle,
   Palette,
+  Fingerprint,
 } from "lucide-react";
 import { Logo } from "./Logo";
 import type { User } from "@shared/schema";
