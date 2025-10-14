@@ -1,0 +1,41 @@
+{
+  "name": "@authflow/js-sdk",
+  "version": "1.0.0",
+  "description": "Official JavaScript/TypeScript SDK for Authflow Authentication Platform",
+  "main": "dist/index.js",
+  "module": "dist/index.mjs",
+  "types": "dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsup src/index.ts --format cjs,esm --dts",
+    "dev": "tsup src/index.ts --format cjs,esm --dts --watch",
+    "prepublishOnly": "npm run build"
+  },
+  "keywords": [
+    "auth",
+    "authentication",
+    "oauth",
+    "mfa",
+    "webauthn",
+    "authflow"
+  ],
+  "author": "Authflow",
+  "license": "MIT",
+  "devDependencies": {
+    "tsup": "^8.0.0",
+    "typescript": "^5.0.0"
+  },
+  "dependencies": {
+    "@simplewebauthn/browser": "^9.0.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/authflow/js-sdk"
+  },
+  "bugs": {
+    "url": "https://github.com/authflow/js-sdk/issues"
+  },
+  "homepage": "https://authflow.dev"
+}
