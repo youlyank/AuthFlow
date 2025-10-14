@@ -132,17 +132,17 @@
   --elevate-1: rgba(255,255,255, .04);
   --elevate-2: rgba(255,255,255, .09);
 
-  --background: 220 13% 9%;
+  --background: 222 14% 8%;
 
   --foreground: 0 0% 98%;
 
-  --border: 220 13% 20%;
+  --border: 220 13% 18%;
 
-  --card: 220 13% 13%;
+  --card: 222 14% 11%;
 
   --card-foreground: 0 0% 98%;
 
-  --card-border: 220 13% 17%;
+  --card-border: 220 13% 15%;
 
   --sidebar: 220 13% 11%;
 
@@ -325,5 +325,74 @@
   .border.active-elevate-2:not(.no-active-interaction-elevate)::after,
   .border.hover-elevate:not(.no-hover-interaction-elevate)::after {
     inset: -1px;
+  }
+
+  /* Modern 2025 Glassmorphism Effects */
+  .glass {
+    @apply backdrop-blur-xl bg-white/10 dark:bg-white/5 border border-white/20 dark:border-white/10;
+  }
+
+  .glass-card {
+    @apply glass shadow-xl transition-all duration-300;
+  }
+
+  .glass-card:hover {
+    @apply bg-white/20 dark:bg-white/10 shadow-2xl;
+  }
+
+  /* Bento Grid System */
+  .bento-grid {
+    @apply grid gap-4 md:gap-6;
+  }
+
+  .bento-item {
+    @apply rounded-2xl p-6 transition-all duration-300 hover:scale-[1.02];
+  }
+
+  /* Modern Animations */
+  @keyframes float {
+    0%, 100% { transform: translateY(0px); }
+    50% { transform: translateY(-10px); }
+  }
+
+  .animate-float {
+    animation: float 3s ease-in-out infinite;
+  }
+
+  @keyframes glow {
+    0%, 100% { opacity: 0.5; }
+    50% { opacity: 1; }
+  }
+
+  .animate-glow {
+    animation: glow 2s ease-in-out infinite;
+  }
+
+  /* Gradient Text */
+  .gradient-text {
+    @apply bg-gradient-to-r from-primary via-blue-500 to-primary bg-clip-text text-transparent;
+  }
+
+  /* Card Hover Effects */
+  .hover-lift {
+    @apply transition-all duration-300;
+  }
+
+  .hover-lift:hover {
+    @apply -translate-y-1 shadow-xl;
+  }
+
+  /* Metric Cards */
+  .metric-card {
+    @apply relative overflow-hidden rounded-xl p-6 border bg-card;
+  }
+
+  .metric-card::before {
+    content: '';
+    @apply absolute inset-0 bg-gradient-to-br from-primary/10 to-transparent opacity-0 transition-opacity duration-300;
+  }
+
+  .metric-card:hover::before {
+    @apply opacity-100;
   }
 }
