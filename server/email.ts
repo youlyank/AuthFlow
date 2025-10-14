@@ -6,38 +6,13 @@ const resend = process.env.RESEND_API_KEY ? new Resend(process.env.RESEND_API_KE
 
 // Email service - Production ready with Resend
 export class EmailService {
-  async sendEmail(to: string, subject: string, html: string): Promise<void> {
-    // In development, log to console
-    if (process.env.NODE_ENV !== "production" || !resend) {
-      console.log(`
-═══════════════════════════════════════════════════════════
-📧 EMAIL ${resend ? "SENT" : "SIMULATED (No API key)"}
-═══════════════════════════════════════════════════════════
-To: ${to}
-Subject: ${subject}
-───────────────────────────────────────────────────────────
-${html.replace(/<[^>]*>/g, "")}
-═══════════════════════════════════════════════════════════
-      `);
-      
-      // If Resend is configured, actually send in development too
-      if (resend) {
-        try {
-          await resend.emails.send({
-            from: process.env.EMAIL_FROM || "Authflow <onboarding@resend.dev>",
-            to,
-            subject,
-            html,
-          });
-        } catch (error) {
-          console.error("Resend error:", error);
-        }
+  async sendEmail(to: string, subject: string, html: string, sensitiveData?: { code?: string; link?: string; password?: string }): Promise<void> {
+    // In production, Resend is REQUIRED - never log, never simulate
+    if (process.env.NODE_ENV === "production") {
+      if (!resend) {
+        throw new Error("PRODUCTION ERROR: RESEND_API_KEY is required for email delivery in production");
       }
-      return;
-    }
-
-    // In production with Resend configured
-    if (resend) {
+      
       try {
         await resend.emails.send({
           from: process.env.EMAIL_FROM || "Authflow <onboarding@resend.dev>",
@@ -49,8 +24,68 @@ ${html.replace(/<[^>]*>/g, "")}
         console.error("Failed to send email:", error);
         throw new Error(`Email delivery failed: ${error}`);
       }
-    } else {
-      throw new Error("No email service configured - RESEND_API_KEY required");
+      return;
+    }
+
+    // Development mode: log with redaction OR send via Resend if configured
+    // NEVER log invitation emails (they contain passwords)
+    if (sensitiveData?.password) {
+      if (!resend) {
+        throw new Error("Invitation emails require RESEND_API_KEY - cannot simulate emails with passwords");
+      }
+      // Send via Resend without logging
+      try {
+        await resend.emails.send({
+          from: process.env.EMAIL_FROM || "Authflow <onboarding@resend.dev>",
+          to,
+          subject,
+          html,
+        });
+        console.log(`📧 INVITATION EMAIL SENT (not logged for security): ${to}`);
+      } catch (error) {
+        console.error("Resend error:", error);
+        throw error;
+      }
+      return;
+    }
+
+    // For non-password emails, log with redaction in development
+    let logContent = html.replace(/<[^>]*>/g, "");
+    
+    // Redact sensitive data for security
+    if (sensitiveData?.code) {
+      const redacted = sensitiveData.code.substring(0, 3) + "***";
+      logContent = logContent.replace(new RegExp(sensitiveData.code, 'g'), redacted);
+    }
+    if (sensitiveData?.link) {
+      const urlObj = new URL(sensitiveData.link);
+      const redacted = `${urlObj.origin}/auth/magic-link?token=***REDACTED***`;
+      logContent = logContent.replace(new RegExp(sensitiveData.link.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g'), redacted);
+    }
+    
+    console.log(`
+═══════════════════════════════════════════════════════════
+📧 EMAIL ${resend ? "SENT" : "SIMULATED (No API key)"}
+═══════════════════════════════════════════════════════════
+To: ${to}
+Subject: ${subject}
+───────────────────────────────────────────────────────────
+${logContent}
+═══════════════════════════════════════════════════════════
+    `);
+    
+    // If Resend is configured, actually send in development too
+    if (resend) {
+      try {
+        await resend.emails.send({
+          from: process.env.EMAIL_FROM || "Authflow <onboarding@resend.dev>",
+          to,
+          subject,
+          html,
+        });
+      } catch (error) {
+        console.error("Resend error:", error);
+      }
     }
   }
 
@@ -92,7 +127,7 @@ ${html.replace(/<[^>]*>/g, "")}
       </html>
     `;
 
-    await this.sendEmail(to, "Verify Your Email - Authflow", html);
+    await this.sendEmail(to, "Verify Your Email - Authflow", html, { code });
   }
 
   async sendPasswordResetEmail(to: string, code: string): Promise<void> {
@@ -136,7 +171,7 @@ ${html.replace(/<[^>]*>/g, "")}
       </html>
     `;
 
-    await this.sendEmail(to, "Reset Your Password - Authflow", html);
+    await this.sendEmail(to, "Reset Your Password - Authflow", html, { code });
   }
 
   async sendMFACode(to: string, code: string): Promise<void> {
@@ -177,13 +212,21 @@ ${html.replace(/<[^>]*>/g, "")}
       </html>
     `;
 
-    await this.sendEmail(to, "Your Security Code - Authflow", html);
+    await this.sendEmail(to, "Your Security Code - Authflow", html, { code });
   }
 
   async sendMagicLink(to: string, token: string, baseUrl: string): Promise<void> {
-    const magicLink = `${baseUrl}/auth/magic-link?token=${token}`;
+    // Validate and sanitize baseUrl to prevent phishing attacks
+    try {
+      const url = new URL(baseUrl);
+      // Only allow http/https protocols
+      if (url.protocol !== "http:" && url.protocol !== "https:") {
+        throw new Error("Invalid protocol");
+      }
+      // Use validated URL for magic link
+      const magicLink = `${url.origin}/auth/magic-link?token=${token}`;
     
-    const html = `
+      const html = `
       <!DOCTYPE html>
       <html>
         <head>
@@ -221,11 +264,23 @@ ${html.replace(/<[^>]*>/g, "")}
       </html>
     `;
 
-    await this.sendEmail(to, "Sign In to Authflow - Magic Link", html);
+      await this.sendEmail(to, "Sign In to Authflow - Magic Link", html, { link: magicLink });
+    } catch (error) {
+      throw new Error(`Invalid magic link URL: ${error}`);
+    }
   }
 
   async sendInvitationEmail(to: string, name: string, loginUrl: string, email: string, tempPassword: string): Promise<void> {
-    const html = `
+    // Validate loginUrl to prevent phishing
+    try {
+      const url = new URL(loginUrl);
+      if (url.protocol !== "http:" && url.protocol !== "https:") {
+        throw new Error("Invalid protocol");
+      }
+      // Use validated URL
+      const validatedLoginUrl = url.toString();
+    
+      const html = `
       <!DOCTYPE html>
       <html>
         <head>
@@ -263,7 +318,7 @@ ${html.replace(/<[^>]*>/g, "")}
               </div>
               <p><strong>Important:</strong> Please change your password after your first login for security.</p>
               <div style="text-align: center;">
-                <a href="${loginUrl}" class="button">Sign In to Authflow</a>
+                <a href="${validatedLoginUrl}" class="button">Sign In to Authflow</a>
               </div>
             </div>
             <div class="footer">
@@ -275,7 +330,10 @@ ${html.replace(/<[^>]*>/g, "")}
       </html>
     `;
 
-    await this.sendEmail(to, "Welcome to Authflow - Your Account is Ready", html);
+      await this.sendEmail(to, "Welcome to Authflow - Your Account is Ready", html, { password: tempPassword });
+    } catch (error) {
+      throw new Error(`Invalid login URL: ${error}`);
+    }
   }
 
   generateOTP(length: number = 6): string {
