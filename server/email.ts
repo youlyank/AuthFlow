@@ -270,6 +270,65 @@ ${logContent}
     }
   }
 
+  async sendSecureInvitationEmail(to: string, name: string, invitationLink: string): Promise<void> {
+    // Validate invitationLink to prevent phishing
+    try {
+      const url = new URL(invitationLink);
+      if (url.protocol !== "http:" && url.protocol !== "https:") {
+        throw new Error("Invalid protocol");
+      }
+      const validatedLink = url.toString();
+    
+      const html = `
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <meta charset="utf-8">
+          <style>
+            body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #333; }
+            .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+            .header { text-align: center; padding: 20px 0; border-bottom: 3px solid #3b82f6; }
+            .button { display: inline-block; padding: 14px 28px; background: #3b82f6; color: white; text-decoration: none; border-radius: 6px; font-weight: 600; margin: 20px 0; }
+            .footer { text-align: center; padding-top: 20px; border-top: 1px solid #e5e7eb; color: #6b7280; font-size: 14px; }
+            .warning { background: #fef3c7; border-left: 4px solid #f59e0b; padding: 12px; margin: 20px 0; }
+          </style>
+        </head>
+        <body>
+          <div class="container">
+            <div class="header">
+              <h1 style="color: #3b82f6; margin: 0;">🔒 Authflow</h1>
+            </div>
+            <div style="padding: 30px 0;">
+              <h2>Welcome to Authflow!</h2>
+              <p>Hi ${name},</p>
+              <p>You've been invited to join Authflow. Click the button below to set your password and activate your account:</p>
+              <div style="text-align: center;">
+                <a href="${validatedLink}" class="button">Set Password & Activate Account</a>
+              </div>
+              <div class="warning">
+                <strong>⚠️ Security Notice:</strong><br>
+                This invitation link will expire in 24 hours.<br>
+                For your security, you'll set your own password during activation.
+              </div>
+              <p>If you didn't expect this invitation, you can safely ignore this email.</p>
+            </div>
+            <div class="footer">
+              <p>© ${new Date().getFullYear()} Authflow. All rights reserved.</p>
+              <p>Sent by Authflow | Enterprise Authentication Platform</p>
+              <p style="font-size: 12px; color: #9ca3af;">This is an automated message, please do not reply.</p>
+            </div>
+          </div>
+        </body>
+      </html>
+      `;
+      
+      await this.sendEmail(to, "Welcome to Authflow - Set Your Password", html);
+    } catch (error) {
+      console.error("Invalid invitation link URL:", error);
+      throw new Error("Invalid invitation link format");
+    }
+  }
+
   async sendInvitationEmail(to: string, name: string, loginUrl: string, email: string, tempPassword: string): Promise<void> {
     // Validate loginUrl to prevent phishing
     try {

@@ -373,6 +373,19 @@ export const passwordResetTokens = pgTable("password_reset_tokens", {
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
+// Invitation Tokens (secure password-set flow)
+export const invitationTokens = pgTable("invitation_tokens", {
+  id: varchar("id")
+    .primaryKey()
+    .default(sql`gen_random_uuid()`),
+  userId: varchar("user_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  token: text("token").notNull().unique(),
+  expiresAt: timestamp("expires_at").notNull(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
 // Notifications
 export const notifications = pgTable(
   "notifications",
@@ -1034,6 +1047,11 @@ export const insertMagicLinkTokenSchema = createInsertSchema(magicLinkTokens).om
   createdAt: true,
 });
 
+export const insertInvitationTokenSchema = createInsertSchema(invitationTokens).omit({
+  id: true,
+  createdAt: true,
+});
+
 export const insertIpRestrictionSchema = createInsertSchema(ipRestrictions).omit({
   id: true,
   createdAt: true,
@@ -1063,6 +1081,7 @@ export const insertBrandingCustomizationSchema = createInsertSchema(brandingCust
 
 // Select types for new tables
 export type MagicLinkToken = typeof magicLinkTokens.$inferSelect;
+export type InvitationToken = typeof invitationTokens.$inferSelect;
 export type IpRestriction = typeof ipRestrictions.$inferSelect;
 export type SecurityEvent = typeof securityEvents.$inferSelect;
 export type GdprRequest = typeof gdprRequests.$inferSelect;
@@ -1071,6 +1090,7 @@ export type BrandingCustomization = typeof brandingCustomizations.$inferSelect;
 
 // Insert types for new tables
 export type InsertMagicLinkToken = z.infer<typeof insertMagicLinkTokenSchema>;
+export type InsertInvitationToken = z.infer<typeof insertInvitationTokenSchema>;
 export type InsertIpRestriction = z.infer<typeof insertIpRestrictionSchema>;
 export type InsertSecurityEvent = z.infer<typeof insertSecurityEventSchema>;
 export type InsertGdprRequest = z.infer<typeof insertGdprRequestSchema>;

@@ -26,6 +26,7 @@ import {
   webhooks,
   webhookDeliveries,
   magicLinkTokens,
+  invitationTokens,
   brandingCustomizations,
   securityEvents,
   ipRestrictions,
@@ -1166,6 +1167,28 @@ export class DbStorage implements IStorage {
       .update(magicLinkTokens)
       .set({ usedAt: new Date() })
       .where(eq(magicLinkTokens.id, id));
+  }
+
+  // =======================
+  // INVITATION TOKEN METHODS
+  // =======================
+  
+  async createInvitationToken(data: any): Promise<any> {
+    const [token] = await db.insert(invitationTokens).values(data).returning();
+    return token;
+  }
+
+  async getInvitationToken(token: string): Promise<any> {
+    const [invitationToken] = await db
+      .select()
+      .from(invitationTokens)
+      .where(eq(invitationTokens.token, token))
+      .limit(1);
+    return invitationToken;
+  }
+
+  async deleteInvitationToken(id: string): Promise<void> {
+    await db.delete(invitationTokens).where(eq(invitationTokens.id, id));
   }
 
   // =======================

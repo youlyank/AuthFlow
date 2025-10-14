@@ -20,6 +20,7 @@ import UniversalRegisterPage from "@/pages/UniversalRegisterPage";
 import MfaVerifyPage from "@/pages/MfaVerifyPage";
 import ForgotPasswordPage from "@/pages/ForgotPasswordPage";
 import MagicLinkCallbackPage from "@/pages/MagicLinkCallbackPage";
+import AcceptInvitation from "@/pages/AcceptInvitation";
 import SuperAdminDashboard from "@/pages/SuperAdminDashboard";
 import SuperAdminTenants from "@/pages/SuperAdminTenants";
 import SuperAdminPlans from "@/pages/SuperAdminPlans";
@@ -143,6 +144,7 @@ function Router() {
       <Route path="/auth/mfa" component={MfaVerifyPage} />
       <Route path="/auth/forgot-password" component={ForgotPasswordPage} />
       <Route path="/auth/magic-link" component={MagicLinkCallbackPage} />
+      <Route path="/invitation/accept" component={AcceptInvitation} />
 
       {/* Public marketing pages */}
       <Route path="/comparison" component={ComparisonPage} />

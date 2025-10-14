@@ -901,6 +901,80 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Accept Invitation (Set Password)
+  app.post("/api/auth/accept-invitation",
+    rateLimitByIP("acceptInvitation"),
+    async (req: Request, res: Response) => {
+    try {
+      const { token, password } = req.body;
+      const ipAddress = req.ip || req.socket.remoteAddress || "unknown";
+
+      // Validate password on server side (critical for security)
+      const passwordSchema = z.string()
+        .min(8, "Password must be at least 8 characters")
+        .regex(/[A-Z]/, "Password must contain at least one uppercase letter")
+        .regex(/[a-z]/, "Password must contain at least one lowercase letter")
+        .regex(/[0-9]/, "Password must contain at least one number")
+        .regex(/[^A-Za-z0-9]/, "Password must contain at least one special character");
+      
+      try {
+        passwordSchema.parse(password);
+      } catch (validationError: any) {
+        return res.status(400).json({ 
+          error: validationError.errors?.[0]?.message || "Invalid password format" 
+        });
+      }
+
+      // Validate invitation token
+      const invitationToken = await storage.getInvitationToken(token);
+      if (!invitationToken || invitationToken.expiresAt < new Date()) {
+        await recordFailedAttempt(ipAddress, "acceptInvitation");
+        return res.status(400).json({ error: "Invalid or expired invitation link" });
+      }
+
+      // Get user
+      const user = await storage.getUser(invitationToken.userId);
+      if (!user) {
+        await recordFailedAttempt(ipAddress, "acceptInvitation");
+        return res.status(400).json({ error: "User not found" });
+      }
+
+      // Reset rate limit on success
+      await resetRateLimit(ipAddress, "acceptInvitation");
+
+      // Set password and mark email as verified
+      const passwordHash = await hashPassword(password);
+      await storage.updateUser(user.id, { 
+        passwordHash, 
+        emailVerified: true 
+      });
+
+      // Delete used token
+      await storage.deleteInvitationToken(invitationToken.id);
+
+      // Create session
+      const sessionToken = generateToken();
+      const session = await storage.createSession({
+        userId: user.id,
+        token: sessionToken,
+        expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000), // 24 hours
+        userAgent: req.headers["user-agent"] || "Unknown",
+        ipAddress,
+      });
+
+      await auditLog(req, "invitation.accepted", "user", user.id);
+
+      res.json({ 
+        message: "Account activated successfully",
+        token: sessionToken,
+        user: { ...user, passwordHash: undefined }
+      });
+    } catch (error: any) {
+      console.error("Invitation acceptance error:", error);
+      res.status(400).json({ error: error.message || "Activation failed" });
+    }
+  });
+
   // Email Verification
   app.post("/api/auth/verify-email", 
     rateLimitByIP("emailVerify"),
@@ -1234,14 +1308,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "User already exists in this tenant" });
       }
 
-      // Generate secure temporary password
-      const tempPassword = randomBytes(16).toString("base64").slice(0, 12) + "!A1";
-      const hashedPassword = await hashPassword(tempPassword);
-
+      // Create user WITHOUT password (they'll set it via invitation link)
       const newUser = await storage.createUser({
         tenantId: req.user.tenantId,
         email,
-        passwordHash: hashedPassword,
+        passwordHash: "", // Empty - user will set password via invitation
         firstName: firstName || "",
         lastName: lastName || "",
         role: role || "user",
@@ -1249,13 +1320,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
         emailVerified: false,
       });
 
-      // Send invitation email
-      await emailService.sendInvitationEmail(
+      // Generate secure invitation token (24-hour expiry)
+      const invitationToken = randomBytes(32).toString("hex");
+      const expiresAt = new Date();
+      expiresAt.setHours(expiresAt.getHours() + 24); // 24-hour expiry
+
+      await storage.createInvitationToken({
+        userId: newUser.id,
+        token: invitationToken,
+        expiresAt,
+      });
+
+      // Build invitation link
+      const baseUrl = process.env.REPLIT_DOMAINS?.split(',')[0] || 'http://localhost:5000';
+      const invitationLink = `${baseUrl}/invitation/accept?token=${invitationToken}`;
+
+      // Send secure invitation email (NO PASSWORD!)
+      await emailService.sendSecureInvitationEmail(
         email,
         firstName || email,
-        `${process.env.REPLIT_DOMAINS?.split(',')[0] || 'http://localhost:5000'}/login`,
-        email,
-        tempPassword
+        invitationLink
       );
 
       await auditLog(req, "user.invited", "user", newUser.id, { email, role });
