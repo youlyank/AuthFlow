@@ -42,6 +42,11 @@ import BrandingCustomizationPage from "@/pages/BrandingCustomizationPage";
 import FeaturesDemoPage from "@/pages/FeaturesDemoPage";
 import ComparisonPage from "@/pages/ComparisonPage";
 import WhyAuthflowPage from "@/pages/WhyAuthflowPage";
+import DocsLandingPage from "@/pages/DocsLandingPage";
+import QuickstartPage from "@/pages/QuickstartPage";
+import SDKDocsPage from "@/pages/SDKDocsPage";
+import ArchitecturePage from "@/pages/ArchitecturePage";
+import APIReferencePage from "@/pages/APIReferencePage";
 
 function ProtectedRoute({ children, allowedRoles }: { children: React.ReactNode; allowedRoles?: string[] }) {
   const { user, isLoading } = useAuth();
@@ -149,6 +154,13 @@ function Router() {
       {/* Public marketing pages */}
       <Route path="/comparison" component={ComparisonPage} />
       <Route path="/why-authflow" component={WhyAuthflowPage} />
+
+      {/* Documentation pages */}
+      <Route path="/docs" component={DocsLandingPage} />
+      <Route path="/docs/quickstart" component={QuickstartPage} />
+      <Route path="/docs/sdks" component={SDKDocsPage} />
+      <Route path="/docs/architecture" component={ArchitecturePage} />
+      <Route path="/docs/api" component={APIReferencePage} />
 
       {/* OAuth2 Consent */}
       <Route path="/oauth2/consent">

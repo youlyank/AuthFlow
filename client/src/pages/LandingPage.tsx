@@ -48,8 +48,8 @@ export default function LandingPage() {
               <Link href="/why-authflow">
                 <Button variant="ghost" size="sm" data-testid="link-why-authflow">Why Us</Button>
               </Link>
-              <Link href="/api-docs">
-                <Button variant="ghost" size="sm">API Docs</Button>
+              <Link href="/docs">
+                <Button variant="ghost" size="sm">Docs</Button>
               </Link>
               <Link href="/login">
                 <Button variant="ghost" size="sm" data-testid="button-login">Login</Button>
@@ -97,10 +97,10 @@ export default function LandingPage() {
                   Start Free Trial
                 </Button>
               </Link>
-              <Link href="/api-docs">
+              <Link href="/docs">
                 <Button size="lg" variant="outline" className="gap-2 h-14 px-10 text-lg glass-card" data-testid="button-view-docs">
                   <Code className="h-5 w-5" />
-                  View API Docs
+                  Documentation
                 </Button>
               </Link>
             </div>
@@ -385,9 +385,9 @@ export default function LandingPage() {
                     );
                   })}
                 </div>
-                <Link href="/api-docs">
+                <Link href="/docs">
                   <Button className="gap-2">
-                    View API Documentation
+                    View Documentation
                     <ArrowRight className="h-4 w-4" />
                   </Button>
                 </Link>
@@ -470,15 +470,15 @@ console.log('Welcome', user.name);`}</code>
             <div>
               <h4 className="font-semibold mb-4">Product</h4>
               <ul className="space-y-2 text-sm text-muted-foreground">
-                <li><Link href="/comparison"><a className="hover:text-foreground transition-colors">Pricing</a></Link></li>
-                <li><Link href="/api-docs"><a className="hover:text-foreground transition-colors">Documentation</a></Link></li>
-                <li><Link href="/why-authflow"><a className="hover:text-foreground transition-colors">Why Authflow</a></Link></li>
+                <li><Link href="/comparison" className="hover:text-foreground transition-colors">Pricing</Link></li>
+                <li><Link href="/docs" className="hover:text-foreground transition-colors">Documentation</Link></li>
+                <li><Link href="/why-authflow" className="hover:text-foreground transition-colors">Why Authflow</Link></li>
               </ul>
             </div>
             <div>
               <h4 className="font-semibold mb-4">Resources</h4>
               <ul className="space-y-2 text-sm text-muted-foreground">
-                <li><a href="/api-docs" className="hover:text-foreground transition-colors">API Reference</a></li>
+                <li><a href="/docs/api" className="hover:text-foreground transition-colors">API Reference</a></li>
                 <li><a href="https://github.com" className="hover:text-foreground transition-colors">GitHub</a></li>
                 <li><a href="#" className="hover:text-foreground transition-colors">Community</a></li>
               </ul>
