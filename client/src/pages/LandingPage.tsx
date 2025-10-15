@@ -48,8 +48,14 @@ export default function LandingPage() {
               <Link href="/why-authflow">
                 <Button variant="ghost" size="sm" data-testid="link-why-authflow">Why Us</Button>
               </Link>
+              <Link href="/sdks">
+                <Button variant="ghost" size="sm" data-testid="link-sdks">SDKs</Button>
+              </Link>
+              <Link href="/developers">
+                <Button variant="ghost" size="sm" data-testid="link-developers">Developers</Button>
+              </Link>
               <Link href="/docs">
-                <Button variant="ghost" size="sm">Docs</Button>
+                <Button variant="ghost" size="sm" data-testid="link-docs">Docs</Button>
               </Link>
               <Link href="/login">
                 <Button variant="ghost" size="sm" data-testid="button-login">Login</Button>
