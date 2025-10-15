@@ -26,6 +26,14 @@ export default function DocsLandingPage() {
       colorText: "text-blue-500"
     },
     {
+      title: "Authentication Flows",
+      description: "OAuth 2.0 & OIDC flow documentation",
+      icon: Shield,
+      href: "/docs/flows",
+      colorBg: "bg-orange-500/10",
+      colorText: "text-orange-500"
+    },
+    {
       title: "Migration Guide",
       description: "Move from Auth0 or Okta to AuthFlow",
       icon: Zap,
@@ -43,7 +51,7 @@ export default function DocsLandingPage() {
     },
     {
       title: "SDKs",
-      description: "Client libraries for 5 languages",
+      description: "Client libraries for 26 languages",
       icon: Puzzle,
       href: "/docs/sdks",
       colorBg: "bg-purple-500/10",

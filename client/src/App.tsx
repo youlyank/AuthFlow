@@ -47,6 +47,7 @@ import QuickstartPage from "@/pages/QuickstartPage";
 import SDKDocsPage from "@/pages/SDKDocsPage";
 import ArchitecturePage from "@/pages/ArchitecturePage";
 import APIReferencePage from "@/pages/APIReferencePage";
+import APIFlowsPage from "@/pages/APIFlowsPage";
 import MigrationGuidePage from "@/pages/MigrationGuidePage";
 import SDKRoadmapPage from "@/pages/SDKRoadmapPage";
 import SDKShowcasePage from "@/pages/SDKShowcasePage";
@@ -166,6 +167,7 @@ function Router() {
       <Route path="/docs/sdk-roadmap" component={SDKRoadmapPage} />
       <Route path="/docs/architecture" component={ArchitecturePage} />
       <Route path="/docs/api" component={APIReferencePage} />
+      <Route path="/docs/flows" component={APIFlowsPage} />
       <Route path="/docs/migration" component={MigrationGuidePage} />
       
       {/* SDK and Developer Pages */}
