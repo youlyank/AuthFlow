@@ -87,7 +87,7 @@ export default function LandingPage() {
             <p className="text-xl sm:text-2xl text-muted-foreground mb-10 max-w-3xl mx-auto leading-relaxed">
               Replace Auth0 and Okta with a modern, cost-effective authentication platform.
               <br className="hidden sm:block" />
-              <span className="font-semibold text-foreground">27+ enterprise features</span> • <span className="font-semibold text-green-600">80% cost savings</span> • <span className="font-semibold text-foreground">Flexible deployment</span>
+              <span className="font-semibold text-foreground">27+ enterprise features</span> • <span className="font-semibold text-green-600">Up to 85% savings</span> • <span className="font-semibold text-foreground">Flexible deployment</span>
             </p>
             
             <div className="flex gap-4 justify-center flex-wrap mb-16">
@@ -110,7 +110,7 @@ export default function LandingPage() {
               {[
                 { value: "99.9%", label: "Uptime SLA", icon: TrendingUp },
                 { value: "27+", label: "Enterprise Features", icon: Layers },
-                { value: "80%", label: "Cost Savings", icon: DollarSign },
+                { value: "85%", label: "Avg Savings", icon: DollarSign },
                 { value: "<10ms", label: "Response Time", icon: Activity },
               ].map((stat, idx) => {
                 const Icon = stat.icon;
@@ -286,10 +286,10 @@ export default function LandingPage() {
               Pricing
             </Badge>
             <h2 className="text-4xl sm:text-5xl font-bold mb-4">
-              80% Lower Cost Than Competitors
+              Up to 85% Lower Cost
             </h2>
             <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-              Enterprise features at a fraction of the cost. No per-user fees.
+              Enterprise features at a fraction of the cost. Volume-based pricing with no hidden fees.
             </p>
           </div>
 
