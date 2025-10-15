@@ -26,6 +26,14 @@ export default function DocsLandingPage() {
       colorText: "text-blue-500"
     },
     {
+      title: "Migration Guide",
+      description: "Move from Auth0 or Okta to AuthFlow",
+      icon: Zap,
+      href: "/docs/migration",
+      colorBg: "bg-yellow-500/10",
+      colorText: "text-yellow-500"
+    },
+    {
       title: "API Reference",
       description: "Complete API documentation with examples",
       icon: Code2,
@@ -40,18 +48,16 @@ export default function DocsLandingPage() {
       href: "/docs/sdks",
       colorBg: "bg-purple-500/10",
       colorText: "text-purple-500"
-    },
-    {
-      title: "Architecture",
-      description: "Understanding AuthFlow's design",
-      icon: FileText,
-      href: "/docs/architecture",
-      colorBg: "bg-orange-500/10",
-      colorText: "text-orange-500"
     }
   ];
 
   const tutorials = [
+    {
+      title: "Migration from Auth0/Okta",
+      description: "Step-by-step migration guide with zero downtime",
+      href: "/docs/migration",
+      time: "2-4 hours"
+    },
     {
       title: "Email & Password Authentication",
       description: "Implement secure login and registration",
@@ -81,12 +87,6 @@ export default function DocsLandingPage() {
       description: "Listen to authentication events",
       href: "/docs/quickstart",
       time: "10 min"
-    },
-    {
-      title: "API Keys",
-      description: "Server-to-server authentication",
-      href: "/docs/quickstart",
-      time: "6 min"
     }
   ];
 
