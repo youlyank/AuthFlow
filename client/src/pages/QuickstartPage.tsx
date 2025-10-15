@@ -255,9 +255,9 @@ authflow.login(
     strategy = LoginStrategy.Biometric,
     callback = { result ->
         result.onSuccess { user ->
-            println("Logged in: ${user.email}")
+            println("Logged in: \${user.email}")
         }.onFailure { error ->
-            println("Error: $error")
+            println("Error: \$error")
         }
     }
 )`,

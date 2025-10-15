@@ -83,12 +83,13 @@ Authflow is built as a full-stack application with a React-based frontend and an
   - All pricing claims consistent: "Up to 85% savings" verified across all sections
 - ✅ **Dashboard Redesign** - All three dashboards (Super Admin, Tenant Admin, User) rebuilt with enterprise analytics, Recharts visualizations, and modern metric cards
 - ✅ **CSS Enhancement** - Added glassmorphic effects, bento grid system, micro-animations (float, glow, slide-up), and refined dark mode palette
-- ✅ **Documentation Hub** - Comprehensive documentation system at `/docs` with 7 main sections:
+- ✅ **Documentation Hub** - Comprehensive documentation system at `/docs` with 8 main sections:
   - Documentation Landing (`/docs`) - Hub with quick links, tutorials, and popular resources
-  - Quickstart Guide (`/docs/quickstart`) - 4-step integration guide with multi-language code examples
+  - Quickstart Guide (`/docs/quickstart`) - 4-step integration guide with ALL 26 SDKs organized by category (Backend, Mobile, Frontend, Framework)
+  - API Authentication Flows (`/docs/flows`) - Complete OAuth 2.0 & OIDC flow documentation (Authorization Code, PKCE, Client Credentials, Resource Owner Password)
   - Migration Guide (`/docs/migration`) - Complete Auth0/Okta to AuthFlow migration guide with zero-downtime strategies
-  - SDK Documentation (`/docs/sdks`) - Client library docs for all 15 SDKs with feature matrix
-  - SDK Roadmap (`/docs/sdk-roadmap`) - Transparent roadmap showing 15 production-ready SDKs with 11 more planned for Q4 2025
+  - SDK Documentation (`/docs/sdks`) - Client library docs for all 26 SDKs with feature matrix
+  - SDK Roadmap (`/docs/sdk-roadmap`) - Transparent roadmap showing 26 production-ready SDKs (87% of Auth0's coverage)
   - Architecture Guide (`/docs/architecture`) - System design, components, and technical concepts
   - API Reference (`/docs/api`) - REST API documentation gateway linking to interactive Swagger UI
 - ✅ **SDK Expansion (October 15, 2025)** - Expanded from 5 to 26 production-ready SDKs:
@@ -119,3 +120,10 @@ Authflow is built as a full-stack application with a React-based frontend and an
 - ✅ Added client SDKs for Go, PHP, and Ruby
 - ✅ Database schema updated with phone number and phone verification fields
 - ✅ All webhook delivery systems operational
+- ✅ **Complete Documentation Overhaul (October 15, 2025)**:
+  - Created comprehensive API Authentication Flows documentation page at `/docs/flows` covering all OAuth 2.0 & OIDC flows
+  - Expanded Quickstart Guide to include ALL 26 SDKs (not just 5) organized by category: Backend (9), Mobile (4), Frontend (8), Framework (6)
+  - Each SDK now has installation, initialization, and authentication code examples
+  - Fixed nested <a> tag HTML validation errors in landing page footer
+  - Added "Authentication Flows" link to documentation hub
+  - Professional Auth0-style documentation structure completed
