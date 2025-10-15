@@ -257,12 +257,12 @@ export default function ComparisonPage() {
           </h1>
           <p className="text-xl text-muted-foreground mb-8 max-w-3xl mx-auto">
             See exactly how Authflow compares to Auth0 and Okta. Same enterprise features, 
-            90% lower cost, with the freedom to self-host.
+            significantly lower cost, with the freedom to self-host.
           </p>
           <div className="flex gap-4 justify-center items-center flex-wrap">
             <div className="flex items-center gap-2 text-green-600">
               <TrendingDown className="h-5 w-5" />
-              <span className="font-semibold">Save 80-90% on costs</span>
+              <span className="font-semibold">Save up to 85% on costs</span>
             </div>
             <div className="flex items-center gap-2 text-primary">
               <Check className="h-5 w-5" />
@@ -412,12 +412,12 @@ export default function ComparisonPage() {
             <Card className="hover-elevate">
               <CardHeader>
                 <DollarSign className="h-10 w-10 text-green-600 mb-2" />
-                <CardTitle>80-90% Cost Savings</CardTitle>
+                <CardTitle>Up to 85% Cost Savings</CardTitle>
               </CardHeader>
               <CardContent>
                 <p className="text-muted-foreground">
-                  Flat pricing with no per-user fees. All features included. No hidden costs.
-                  Perfect for growing businesses.
+                  Volume-based pricing with no hidden fees. All features included at every tier.
+                  Save more as you scale.
                 </p>
               </CardContent>
             </Card>
