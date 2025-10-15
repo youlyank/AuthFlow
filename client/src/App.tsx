@@ -48,6 +48,7 @@ import SDKDocsPage from "@/pages/SDKDocsPage";
 import ArchitecturePage from "@/pages/ArchitecturePage";
 import APIReferencePage from "@/pages/APIReferencePage";
 import MigrationGuidePage from "@/pages/MigrationGuidePage";
+import SDKRoadmapPage from "@/pages/SDKRoadmapPage";
 
 function ProtectedRoute({ children, allowedRoles }: { children: React.ReactNode; allowedRoles?: string[] }) {
   const { user, isLoading } = useAuth();
@@ -160,6 +161,7 @@ function Router() {
       <Route path="/docs" component={DocsLandingPage} />
       <Route path="/docs/quickstart" component={QuickstartPage} />
       <Route path="/docs/sdks" component={SDKDocsPage} />
+      <Route path="/docs/sdk-roadmap" component={SDKRoadmapPage} />
       <Route path="/docs/architecture" component={ArchitecturePage} />
       <Route path="/docs/api" component={APIReferencePage} />
       <Route path="/docs/migration" component={MigrationGuidePage} />

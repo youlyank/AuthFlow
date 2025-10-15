@@ -26,32 +26,57 @@ import {
 export default function ComparisonPage() {
   const [mau, setMau] = useState(10000);
 
-  // Calculate costs based on MAU
+  // Calculate costs based on MAU (Updated with real Auth0 2025 pricing)
   const calculateCosts = () => {
-    // Auth0 pricing: ~$0.50 per MAU for 10K+ users, plus base fee
-    const auth0Base = 240;
-    const auth0PerUser = mau > 1000 ? (mau - 1000) * 0.50 : 0;
-    const auth0Premium = 2000; // Premium features
-    const auth0Total = (auth0Base + auth0PerUser + auth0Premium) * 12;
+    // Auth0 2025 Real Pricing (B2C)
+    // Free: Up to 25K MAU (limited features, no MFA/RBAC)
+    // Essentials: $35/mo base + 500 MAU included, $0.07/MAU overage (adds MFA, RBAC)
+    // Professional: $240/mo base + 1K MAU included (full features)
+    // Enterprise: $30K+/year (custom pricing)
+    
+    // Most businesses need at least Essentials for MFA/RBAC
+    let auth0Monthly = 0;
+    if (mau <= 500) {
+      // Essentials tier for basic production features
+      auth0Monthly = 35;
+    } else if (mau <= 1000) {
+      // Essentials with overage OR Professional
+      const essentialsWithOverage = 35 + (mau - 500) * 0.07;
+      const professional = 240;
+      auth0Monthly = Math.min(essentialsWithOverage, professional);
+    } else {
+      // Professional base + overage at $0.07/MAU
+      auth0Monthly = 240 + (mau - 1000) * 0.07;
+    }
+    const auth0Annual = Math.round(auth0Monthly * 12);
 
-    // Okta pricing: ~$2-5 per user/month
-    const oktaPerUser = mau * 2;
-    const oktaTotal = oktaPerUser * 12;
+    // Okta pricing: $2-3 per user/month for enterprise
+    const oktaMonthly = Math.round(mau * 2.5);
+    const oktaAnnual = oktaMonthly * 12;
 
-    // Authflow: Flat $99-299/mo
-    const authflowTotal = 200 * 12; // Average of $99-299
+    // Authflow: Pay-per-MAU with volume discounts
+    // Up to 10K: $0.02/MAU | 10K-50K: $0.015/MAU | 50K+: $0.01/MAU
+    let authflowMonthly = 0;
+    if (mau <= 10000) {
+      authflowMonthly = Math.max(99, mau * 0.02); // Min $99/mo
+    } else if (mau <= 50000) {
+      authflowMonthly = 200 + (mau - 10000) * 0.015;
+    } else {
+      authflowMonthly = 800 + (mau - 50000) * 0.01;
+    }
+    const authflowAnnual = Math.round(authflowMonthly * 12);
 
     return {
-      auth0Monthly: Math.round(auth0Base + auth0PerUser + auth0Premium),
-      auth0Annual: Math.round(auth0Total),
-      oktaMonthly: Math.round(oktaPerUser),
-      oktaAnnual: Math.round(oktaTotal),
-      authflowMonthly: 200,
-      authflowAnnual: authflowTotal,
-      savingsVsAuth0: Math.round(auth0Total - authflowTotal),
-      savingsVsOkta: Math.round(oktaTotal - authflowTotal),
-      savingsPercentAuth0: Math.round(((auth0Total - authflowTotal) / auth0Total) * 100),
-      savingsPercentOkta: Math.round(((oktaTotal - authflowTotal) / oktaTotal) * 100),
+      auth0Monthly: Math.round(auth0Monthly),
+      auth0Annual,
+      oktaMonthly,
+      oktaAnnual,
+      authflowMonthly: Math.round(authflowMonthly),
+      authflowAnnual,
+      savingsVsAuth0: Math.max(0, auth0Annual - authflowAnnual),
+      savingsVsOkta: Math.max(0, oktaAnnual - authflowAnnual),
+      savingsPercentAuth0: auth0Annual > 0 ? Math.round(((auth0Annual - authflowAnnual) / auth0Annual) * 100) : 0,
+      savingsPercentOkta: oktaAnnual > 0 ? Math.round(((oktaAnnual - authflowAnnual) / oktaAnnual) * 100) : 0,
     };
   };
 
@@ -125,13 +150,13 @@ export default function ComparisonPage() {
       name: "Authflow",
       color: "primary",
       features: [
-        "Flat licensing fee",
-        "No per-user charges",
+        "Volume-based pricing",
         "All features included",
-        "Unlimited MAU",
+        "$0.01-0.02 per MAU",
+        "No hidden fees",
         "Self-host option available",
       ],
-      price: "$99-299",
+      price: "$99+",
       period: "/month",
       savings: null,
       recommended: true,
@@ -140,30 +165,30 @@ export default function ComparisonPage() {
       name: "Auth0",
       color: "secondary",
       features: [
-        "Starts at $240/mo for 1K MAU",
-        "$0.50 per extra user",
-        "Basic features only",
-        "Premium features cost extra",
-        "Cloud only",
+        "25K MAU free tier",
+        "Essentials: $35/mo (500 MAU)",
+        "Pro: $240/mo (1K MAU)",
+        "$0.07/MAU overage",
+        "Enterprise: $30K+/year",
       ],
-      price: "$2,400+",
+      price: "$0-240+",
       period: "/month",
-      savings: "90% more expensive",
+      savings: "Varies",
       recommended: false,
     },
     {
       name: "Okta",
       color: "secondary",
       features: [
-        "Starts at $2/user/month",
-        "Minimum commitments",
-        "Enterprise focused",
+        "$2-3 per user/month",
+        "Enterprise minimum",
+        "Annual commitments",
         "Complex pricing tiers",
         "Cloud only",
       ],
-      price: "$5,000+",
+      price: "$2,000+",
       period: "/month",
-      savings: "95% more expensive",
+      savings: "Much higher",
       recommended: false,
     },
   ];
@@ -307,10 +332,10 @@ export default function ComparisonPage() {
 
           <div className="text-center mt-12">
             <p className="text-sm text-muted-foreground">
-              Example: For 10,000 users, Auth0 costs ~$5,000/month. Authflow: ~$200-500/month
+              Example: For 10,000 MAU, Auth0 Professional: ~$870/month | AuthFlow: ~$200/month
             </p>
             <p className="text-2xl font-bold text-green-600 mt-2">
-              💰 Save over $50,000 per year
+              💰 Save ~$8,000 per year at 10K MAU
             </p>
           </div>
         </div>
