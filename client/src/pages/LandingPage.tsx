@@ -32,7 +32,7 @@ import {
   Star,
   ChevronRight,
 } from "lucide-react";
-import { SiGoogle, SiGithub, SiMicrosoft, SiAmazon, SiNetflix, SiSpotify, SiSlack, SiDropbox } from "react-icons/si";
+import { SiGoogle, SiGithub, SiAmazon, SiNetflix, SiSpotify, SiSlack, SiDropbox, SiFacebook } from "react-icons/si";
 
 export default function LandingPage() {
   return (
@@ -135,7 +135,7 @@ export default function LandingPage() {
           <div className="grid grid-cols-2 md:grid-cols-4 gap-8 max-w-5xl mx-auto items-center">
             {[
               { Icon: SiGoogle, name: "Google" },
-              { Icon: SiMicrosoft, name: "Microsoft" },
+              { Icon: SiFacebook, name: "Facebook" },
               { Icon: SiNetflix, name: "Netflix" },
               { Icon: SiSpotify, name: "Spotify" },
               { Icon: SiSlack, name: "Slack" },
