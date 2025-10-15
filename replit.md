@@ -92,6 +92,14 @@ Authflow is built as a full-stack application with a React-based frontend and an
   - SDK coverage: Now 15 production-ready SDKs (up from 5) vs Auth0's 30+, with 11 more planned for Q4 2025 to reach 26 total
   - Pricing calculator assumes businesses need at least Essentials tier for production features (MFA/RBAC)
   - Pricing examples consistent across all pages: 10K MAU = AuthFlow $200/mo vs Auth0 $870/mo = ~$8K/year savings
+- ✅ **WebAuthn/Passkey Enhancements (October 15, 2025)** - Full passwordless authentication integration:
+  - Added Passkey login button to main Login page with email-based WebAuthn authentication
+  - Universal Login page already has full Passkey support for tenant white-labeling
+  - Added passkey setup dialog during registration flow to encourage passwordless adoption
+  - Users can now sign in with fingerprint, Face ID, Touch ID, Windows Hello, or hardware security keys
+  - Passkey management available at `/passkeys` page for registered users
+  - Backend APIs: `/api/webauthn/register/start`, `/api/webauthn/register/verify`, `/api/webauthn/authenticate/start`, `/api/webauthn/authenticate/verify`
+  - FIDO2 compliant, WebAuthn Level 2 standard, challenge-response authentication
 - ✅ Fixed JavaScript SDK field mappings (firstName/lastName alignment with API)
 - ✅ Implemented SMS integration with Twilio for MFA and phone verification
 - ✅ Built Actions/Hooks system for custom authentication logic

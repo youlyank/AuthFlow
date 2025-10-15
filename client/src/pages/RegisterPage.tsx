@@ -2,9 +2,10 @@ import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { registerSchema, type RegisterInput } from "@shared/schema";
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
+import { startRegistration } from "@simplewebauthn/browser";
 import {
   Form,
   FormControl,
@@ -17,15 +18,28 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Logo } from "@/components/Logo";
 import { ThemeToggle } from "@/components/ThemeToggle";
-import { Eye, EyeOff, Mail, Lock, User, UserPlus } from "lucide-react";
+import { Eye, EyeOff, Mail, Lock, User, UserPlus, Fingerprint, ShieldCheck } from "lucide-react";
 import { SiGoogle, SiGithub } from "react-icons/si";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 export default function RegisterPage() {
   const [, setLocation] = useLocation();
   const [showPassword, setShowPassword] = useState(false);
+  const [showPasskeyDialog, setShowPasskeyDialog] = useState(false);
+  const [registeredUserData, setRegisteredUserData] = useState<any>(null);
   const { toast } = useToast();
+  const queryClient = useQueryClient();
 
   const form = useForm<RegisterInput>({
     resolver: zodResolver(registerSchema),
@@ -39,14 +53,16 @@ export default function RegisterPage() {
 
   const registerMutation = useMutation({
     mutationFn: async (data: RegisterInput) => {
-      return apiRequest("POST", "/api/auth/register", data);
+      return apiRequest("POST", "/api/auth/register", data) as Promise<any>;
     },
-    onSuccess: () => {
+    onSuccess: (data: any) => {
+      // Store user data and show passkey setup dialog
+      setRegisteredUserData(data);
+      setShowPasskeyDialog(true);
       toast({
         title: "Account created!",
-        description: "Please check your email to verify your account.",
+        description: "Set up passwordless login with a passkey for enhanced security.",
       });
-      setLocation("/auth/login");
     },
     onError: (error: Error) => {
       toast({
@@ -56,6 +72,51 @@ export default function RegisterPage() {
       });
     },
   });
+
+  const passkeySetupMutation = useMutation({
+    mutationFn: async () => {
+      // Auto-login the user first if we have their data
+      if (registeredUserData?.user) {
+        queryClient.setQueryData(["/api/auth/me"], { user: registeredUserData.user });
+      }
+
+      // Start passkey registration
+      const options = await apiRequest("POST", "/api/webauthn/register/start", {}) as any;
+      
+      // Trigger browser WebAuthn
+      const credential = await startRegistration({ optionsJSON: options });
+      
+      // Verify registration
+      await apiRequest("POST", "/api/webauthn/register/verify", {
+        response: credential,
+        deviceName: "Primary Device",
+      });
+      
+      return true;
+    },
+    onSuccess: () => {
+      toast({
+        title: "Passkey registered!",
+        description: "You can now sign in with your fingerprint, face, or security key.",
+      });
+      setShowPasskeyDialog(false);
+      setLocation("/");
+    },
+    onError: (error: Error) => {
+      toast({
+        variant: "destructive",
+        title: "Passkey setup failed",
+        description: error.message || "You can set up a passkey later in security settings.",
+      });
+      setShowPasskeyDialog(false);
+      setLocation("/auth/login");
+    },
+  });
+
+  const handleSkipPasskey = () => {
+    setShowPasskeyDialog(false);
+    setLocation("/auth/login");
+  };
 
   const handleOAuthRegister = (provider: "google" | "github") => {
     window.location.href = `/api/auth/oauth/${provider}`;
@@ -263,6 +324,52 @@ export default function RegisterPage() {
           </p>
         </CardFooter>
       </Card>
+
+      {/* Passkey Setup Dialog */}
+      <AlertDialog open={showPasskeyDialog} onOpenChange={setShowPasskeyDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <div className="flex justify-center mb-4">
+              <div className="p-4 rounded-full bg-primary/10">
+                <ShieldCheck className="h-12 w-12 text-primary" />
+              </div>
+            </div>
+            <AlertDialogTitle className="text-center text-2xl">
+              Set up passwordless login?
+            </AlertDialogTitle>
+            <AlertDialogDescription className="text-center">
+              Secure your account with a passkey using your fingerprint, face, or security key.
+              It's faster and more secure than passwords!
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="flex-col sm:flex-row gap-2">
+            <AlertDialogCancel
+              onClick={handleSkipPasskey}
+              disabled={passkeySetupMutation.isPending}
+              data-testid="button-skip-passkey"
+            >
+              Skip for now
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => passkeySetupMutation.mutate()}
+              disabled={passkeySetupMutation.isPending}
+              data-testid="button-setup-passkey"
+            >
+              {passkeySetupMutation.isPending ? (
+                <>
+                  <div className="animate-spin mr-2 h-4 w-4 border-2 border-current border-t-transparent rounded-full" />
+                  Setting up...
+                </>
+              ) : (
+                <>
+                  <Fingerprint className="mr-2 h-4 w-4" />
+                  Set up passkey
+                </>
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
