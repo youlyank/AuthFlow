@@ -33,12 +33,25 @@ Authflow is built as a full-stack application with a React-based frontend and an
 - **Actions/Hooks System:** Pluggable authentication flow customization allowing tenants to inject custom logic at key points (pre-register, post-register, pre-login, post-login, etc.) via built-in handlers and webhook-based actions.
 - **Security:** Comprehensive audit logging, login history, trusted device fingerprinting, rate limiting, password breach detection (Have I Been Pwned integration), IP restrictions, and GDPR compliance tools. All secrets are hashed (bcrypt for passwords, SHA-256 for OAuth2 client secrets and API keys).
 - **API Documentation:** Interactive OpenAPI/Swagger documentation available at `/api-docs` endpoint for all API endpoints.
-- **SDKs:** Official client libraries for multiple languages:
-  - **Python SDK:** Full-featured with authentication, MFA, WebAuthn, OAuth2, and API key support
-  - **JavaScript/TypeScript SDK:** Browser and Node.js compatible with session management
-  - **Go SDK:** Type-safe client with comprehensive authentication methods
-  - **PHP SDK:** PSR-4 compliant with Composer support
-  - **Ruby SDK:** Gem-based client for Rails and Ruby applications
+- **SDKs:** Official client libraries for 15 platforms (expanded October 15, 2025 to compete with Auth0's 30+ SDKs):
+  - **Backend SDKs (5):**
+    - Python: Full auth, MFA, WebAuthn, OAuth2, Django/Flask/FastAPI support
+    - JavaScript/TypeScript: Browser & Node.js, session management
+    - Go: Type-safe client, all auth methods, Goroutines
+    - PHP: PSR-4 compliant, Composer, Laravel/Symfony support
+    - Ruby: Rails integration, gem-based, full MFA
+  - **Mobile SDKs (6):**
+    - .NET/C#: ASP.NET Core, Blazor, MAUI, .NET 8+
+    - Java: Spring Boot, Jakarta EE, async support
+    - Swift (iOS): SwiftUI, Face ID, Touch ID, Sign in with Apple
+    - Kotlin (Android): Jetpack Compose, Coroutines, Biometrics
+    - Flutter: iOS, Android, Web, Desktop cross-platform
+    - React Native: Expo & bare workflow, hooks, biometrics
+  - **Frontend Framework SDKs (4):**
+    - React: Hooks, Context, HOCs, React 18+, TypeScript
+    - Angular: Services, Guards, Interceptors, Angular 14+
+    - Vue: Composition API, Pinia, Vue 3, TypeScript
+    - Next.js: App Router, Server Components, Middleware, Edge
 
 ## External Dependencies
 - **Database:** PostgreSQL (specifically Neon for cloud deployment)
@@ -63,14 +76,20 @@ Authflow is built as a full-stack application with a React-based frontend and an
   - Documentation Landing (`/docs`) - Hub with quick links, tutorials, and popular resources
   - Quickstart Guide (`/docs/quickstart`) - 4-step integration guide with multi-language code examples
   - Migration Guide (`/docs/migration`) - Complete Auth0/Okta to AuthFlow migration guide with zero-downtime strategies
-  - SDK Documentation (`/docs/sdks`) - Client library docs for Python, JS, Go, PHP, Ruby with feature matrix
-  - SDK Roadmap (`/docs/sdk-roadmap`) - Transparent roadmap showing path from 5 to 26 SDKs by end of 2025 (Auth0 has 30+)
+  - SDK Documentation (`/docs/sdks`) - Client library docs for all 15 SDKs with feature matrix
+  - SDK Roadmap (`/docs/sdk-roadmap`) - Transparent roadmap showing 15 production-ready SDKs with 11 more planned for Q4 2025
   - Architecture Guide (`/docs/architecture`) - System design, components, and technical concepts
   - API Reference (`/docs/api`) - REST API documentation gateway linking to interactive Swagger UI
+- ✅ **SDK Expansion (October 15, 2025)** - Expanded from 5 to 15 production-ready SDKs:
+  - Built 10 new SDKs: .NET/C#, Java, Swift, Kotlin, Flutter, React Native, React, Angular, Vue, Next.js
+  - Created SDK Showcase page (`/sdks`) - Professional showcase of all 15 SDKs with feature matrices, installation guides, and downloads
+  - Created Developer Hub page (`/developers`) - Comprehensive resource center with quickstarts, tutorials, code samples, and API reference links
+  - Updated SDK Roadmap page to show 15 production-ready SDKs (vs Auth0's 30+) with 11 more planned for Q4 2025
+  - Added navigation links to SDK Showcase and Developer Hub on landing page and across the site
 - ✅ **Accurate Competitive Positioning** (October 15, 2025):
   - Updated pricing comparison with verified Auth0 2025 data (Free: 25K MAU but limited features, Essentials: $35/mo, Professional: $240/mo)
   - All savings claims verified: "Save up to 85% on costs" based on actual calculator outputs
-  - SDK roadmap shows honest gap: Currently 5 SDKs vs Auth0's 30+, with plan to reach 26 by end of 2025
+  - SDK coverage: Now 15 production-ready SDKs (up from 5) vs Auth0's 30+, with 11 more planned for Q4 2025 to reach 26 total
   - Pricing calculator assumes businesses need at least Essentials tier for production features (MFA/RBAC)
   - Pricing examples consistent across all pages: 10K MAU = AuthFlow $200/mo vs Auth0 $870/mo = ~$8K/year savings
 - ✅ Fixed JavaScript SDK field mappings (firstName/lastName alignment with API)
