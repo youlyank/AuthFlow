@@ -49,6 +49,8 @@ import ArchitecturePage from "@/pages/ArchitecturePage";
 import APIReferencePage from "@/pages/APIReferencePage";
 import MigrationGuidePage from "@/pages/MigrationGuidePage";
 import SDKRoadmapPage from "@/pages/SDKRoadmapPage";
+import SDKShowcasePage from "@/pages/SDKShowcasePage";
+import DeveloperHubPage from "@/pages/DeveloperHubPage";
 
 function ProtectedRoute({ children, allowedRoles }: { children: React.ReactNode; allowedRoles?: string[] }) {
   const { user, isLoading } = useAuth();
@@ -165,6 +167,10 @@ function Router() {
       <Route path="/docs/architecture" component={ArchitecturePage} />
       <Route path="/docs/api" component={APIReferencePage} />
       <Route path="/docs/migration" component={MigrationGuidePage} />
+      
+      {/* SDK and Developer Pages */}
+      <Route path="/sdks" component={SDKShowcasePage} />
+      <Route path="/developers" component={DeveloperHubPage} />
 
       {/* OAuth2 Consent */}
       <Route path="/oauth2/consent">

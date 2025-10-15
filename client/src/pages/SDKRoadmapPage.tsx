@@ -7,61 +7,56 @@ import { Badge } from "@/components/ui/badge";
 export default function SDKRoadmapPage() {
   const sdkStatus = [
     {
-      category: "✅ Production Ready (Q1 2025)",
+      category: "✅ Production Ready (October 2025)",
       sdks: [
-        { name: "Python", status: "ready", features: "Full auth, MFA, WebAuthn, OAuth2" },
-        { name: "JavaScript/TypeScript", status: "ready", features: "Browser & Node.js, session management" },
-        { name: "Go", status: "ready", features: "Type-safe client, all auth methods" },
-        { name: "PHP", status: "ready", features: "PSR-4 compliant, Composer support" },
-        { name: "Ruby", status: "ready", features: "Rails integration, gem-based" }
+        { name: "Python", status: "ready", features: "Full auth, MFA, WebAuthn, OAuth2, Django, Flask, FastAPI" },
+        { name: "JavaScript/TypeScript", status: "ready", features: "Browser & Node.js, session management, TypeScript" },
+        { name: "Go", status: "ready", features: "Type-safe client, all auth methods, Goroutines" },
+        { name: "PHP", status: "ready", features: "PSR-4 compliant, Composer, Laravel, Symfony" },
+        { name: "Ruby", status: "ready", features: "Rails integration, gem-based, full MFA" },
+        { name: ".NET/C#", status: "ready", features: "ASP.NET Core, Blazor, MAUI, .NET 8" },
+        { name: "Java", status: "ready", features: "Spring Boot, Jakarta EE, async support" },
+        { name: "Swift (iOS)", status: "ready", features: "SwiftUI, Face ID, Touch ID, Sign in with Apple" },
+        { name: "Kotlin (Android)", status: "ready", features: "Jetpack Compose, Coroutines, Biometrics" },
+        { name: "Flutter", status: "ready", features: "iOS, Android, Web, Desktop support" },
+        { name: "React Native", status: "ready", features: "Expo & bare workflow, hooks, biometrics" },
+        { name: "React", status: "ready", features: "Hooks, Context, HOCs, React 18+, TypeScript" },
+        { name: "Angular", status: "ready", features: "Services, Guards, Interceptors, Angular 14+" },
+        { name: "Vue", status: "ready", features: "Composition API, Pinia, Vue 3, TypeScript" },
+        { name: "Next.js", status: "ready", features: "App Router, Server Components, Middleware, Edge" }
       ]
     },
     {
-      category: "🚀 In Development (Q2 2025)",
+      category: "📋 Planned (Q4 2025)",
       sdks: [
-        { name: "React", status: "beta", features: "Hooks-based, React 18+, context API" },
-        { name: "Next.js", status: "beta", features: "App Router, middleware, RSC support" },
-        { name: "Angular", status: "development", features: "v17+ standalone components" },
-        { name: "Vue", status: "development", features: "Vue 3 Composition API" },
-        { name: "Laravel", status: "beta", features: "v10+ middleware, Sanctum integration" },
-        { name: "Django", status: "development", features: "Django 4.2+, async views" },
-        { name: "Flutter", status: "development", features: "iOS, Android, Web support" },
-        { name: "React Native", status: "development", features: "Expo & bare workflow" }
-      ]
-    },
-    {
-      category: "📋 Planned (Q3-Q4 2025)",
-      sdks: [
-        { name: "Spring Boot", status: "planned", features: "Java 17+, Spring Security integration" },
-        { name: "ASP.NET Core", status: "planned", features: ".NET 8, minimal APIs" },
-        { name: "Express.js", status: "planned", features: "Middleware-based, TypeScript" },
-        { name: "FastAPI", status: "planned", features: "Python async, Pydantic models" },
-        { name: "Swift (iOS)", status: "planned", features: "SwiftUI, async/await" },
-        { name: "Kotlin (Android)", status: "planned", features: "Jetpack Compose, Coroutines" },
-        { name: "Rust", status: "planned", features: "Actix/Axum integration" },
-        { name: ".NET MAUI", status: "planned", features: "Cross-platform mobile" },
-        { name: "Svelte/SvelteKit", status: "planned", features: "Svelte 5 runes" },
-        { name: "Blazor", status: "planned", features: "Server & WASM" },
-        { name: "Remix", status: "planned", features: "Full-stack React" },
-        { name: "NestJS", status: "planned", features: "TypeScript decorators" },
-        { name: "Deno", status: "planned", features: "Modern TypeScript runtime" }
+        { name: "Laravel", status: "planned", features: "v10+ middleware, Sanctum integration" },
+        { name: "Django", status: "planned", features: "Django 5+, async views, middleware" },
+        { name: "Express.js", status: "planned", features: "Middleware-based, TypeScript support" },
+        { name: "Rust", status: "planned", features: "Actix/Axum integration, async" },
+        { name: "Svelte/SvelteKit", status: "planned", features: "Svelte 5 runes, server routes" },
+        { name: "Blazor", status: "planned", features: "Server & WebAssembly support" },
+        { name: "Remix", status: "planned", features: "Full-stack React framework" },
+        { name: "NestJS", status: "planned", features: "TypeScript decorators, guards" },
+        { name: "Deno", status: "planned", features: "Modern TypeScript runtime" },
+        { name: "Nuxt", status: "planned", features: "Vue meta-framework, SSR" },
+        { name: "SolidJS", status: "planned", features: "Fine-grained reactivity" }
       ]
     },
     {
       category: "🔮 Future (2026+)",
       sdks: [
-        { name: "Ruby on Rails API", status: "future", features: "Rails 7.1+ API mode" },
         { name: "Elixir/Phoenix", status: "future", features: "LiveView support" },
-        { name: "Scala/Play", status: "future", features: "Akka integration" }
+        { name: "Scala/Play", status: "future", features: "Akka integration" },
+        { name: "Haskell", status: "future", features: "Servant/Yesod integration" }
       ]
     }
   ];
 
   const comparison = {
     auth0: 30,
-    authflow: 5,
-    planned: 26, // 5 ready + 8 in dev + 13 planned for 2025
-    future: 3   // 3 for 2026+
+    authflow: 15, // Updated: 15 SDKs now production ready!
+    planned: 11,  // 11 planned for Q4 2025
+    future: 3     // 3 for 2026+
   };
 
   const getStatusBadge = (status: string) => {
