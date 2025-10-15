@@ -614,30 +614,30 @@ app.get('/api/profile',
             <div>
               <h4 className="font-semibold mb-4">Product</h4>
               <ul className="space-y-2 text-sm text-muted-foreground">
-                <li><Link href="/pricing"><a className="hover:text-foreground">Pricing</a></Link></li>
-                <li><Link href="/features"><a className="hover:text-foreground">Features</a></Link></li>
-                <li><Link href="/sdks"><a className="hover:text-foreground">SDKs</a></Link></li>
-                <li><Link href="/comparison"><a className="hover:text-foreground">vs Auth0</a></Link></li>
+                <li><Link href="/pricing" className="hover:text-foreground">Pricing</Link></li>
+                <li><Link href="/features" className="hover:text-foreground">Features</Link></li>
+                <li><Link href="/sdks" className="hover:text-foreground">SDKs</Link></li>
+                <li><Link href="/comparison" className="hover:text-foreground">vs Auth0</Link></li>
               </ul>
             </div>
 
             <div>
               <h4 className="font-semibold mb-4">Developers</h4>
               <ul className="space-y-2 text-sm text-muted-foreground">
-                <li><Link href="/docs"><a className="hover:text-foreground">Documentation</a></Link></li>
-                <li><Link href="/docs/quickstart"><a className="hover:text-foreground">Quick Start</a></Link></li>
-                <li><Link href="/api-docs"><a className="hover:text-foreground">API Reference</a></Link></li>
-                <li><Link href="/docs/migration"><a className="hover:text-foreground">Migration Guide</a></Link></li>
+                <li><Link href="/docs" className="hover:text-foreground">Documentation</Link></li>
+                <li><Link href="/docs/quickstart" className="hover:text-foreground">Quick Start</Link></li>
+                <li><Link href="/api-docs" className="hover:text-foreground">API Reference</Link></li>
+                <li><Link href="/docs/migration" className="hover:text-foreground">Migration Guide</Link></li>
               </ul>
             </div>
 
             <div>
               <h4 className="font-semibold mb-4">Company</h4>
               <ul className="space-y-2 text-sm text-muted-foreground">
-                <li><Link href="/about"><a className="hover:text-foreground">About</a></Link></li>
-                <li><Link href="/blog"><a className="hover:text-foreground">Blog</a></Link></li>
-                <li><Link href="/security"><a className="hover:text-foreground">Security</a></Link></li>
-                <li><Link href="/contact"><a className="hover:text-foreground">Contact</a></Link></li>
+                <li><Link href="/about" className="hover:text-foreground">About</Link></li>
+                <li><Link href="/blog" className="hover:text-foreground">Blog</Link></li>
+                <li><Link href="/security" className="hover:text-foreground">Security</Link></li>
+                <li><Link href="/contact" className="hover:text-foreground">Contact</Link></li>
               </ul>
             </div>
           </div>
@@ -647,9 +647,9 @@ app.get('/api/profile',
               © 2025 AuthFlow. All rights reserved.
             </p>
             <div className="flex gap-6 text-sm text-muted-foreground">
-              <Link href="/privacy"><a className="hover:text-foreground">Privacy</a></Link>
-              <Link href="/terms"><a className="hover:text-foreground">Terms</a></Link>
-              <Link href="/security"><a className="hover:text-foreground">Security</a></Link>
+              <Link href="/privacy" className="hover:text-foreground">Privacy</Link>
+              <Link href="/terms" className="hover:text-foreground">Terms</Link>
+              <Link href="/security" className="hover:text-foreground">Security</Link>
             </div>
           </div>
         </div>
