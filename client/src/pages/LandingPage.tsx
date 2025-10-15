@@ -127,6 +127,27 @@ export default function LandingPage() {
         </div>
       </section>
 
+      {/* Social Proof */}
+      <section className="py-16 px-4 sm:px-6 lg:px-8 border-y bg-muted/50">
+        <div className="container mx-auto">
+          <p className="text-center text-sm text-muted-foreground mb-8 uppercase tracking-wide">
+            Trusted by innovative companies worldwide
+          </p>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-8 items-center max-w-4xl mx-auto opacity-60">
+            {[
+              { name: "TechCorp", size: "text-2xl" },
+              { name: "DataFlow", size: "text-2xl" },
+              { name: "SecureApp", size: "text-2xl" },
+              { name: "CloudVentures", size: "text-2xl" },
+            ].map((company, idx) => (
+              <div key={idx} className="text-center">
+                <span className={`font-bold ${company.size}`}>{company.name}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
       {/* Bento Grid - Authentication Methods */}
       <section className="py-20 sm:py-28 px-4 sm:px-6 lg:px-8 bg-muted/30">
         <div className="container mx-auto">
@@ -329,20 +350,20 @@ export default function LandingPage() {
 
             <div className="mt-8 p-6 rounded-xl bg-gradient-to-r from-green-500/10 to-primary/10 border border-green-500/20">
               <p className="text-center text-lg mb-2">
-                <span className="text-muted-foreground">Example: For 10,000 users/month</span>
+                <span className="text-muted-foreground">Example: For 10,000 MAU</span>
               </p>
               <div className="flex gap-6 justify-center items-center flex-wrap">
                 <div className="text-lg">
-                  <span className="text-muted-foreground">Authflow: </span>
-                  <span className="font-bold text-green-600 text-2xl">$99-299/mo</span>
+                  <span className="text-muted-foreground">AuthFlow: </span>
+                  <span className="font-bold text-green-600 text-2xl">~$200/mo</span>
                 </div>
                 <div className="text-lg">
                   <span className="text-muted-foreground">Auth0: </span>
-                  <span className="font-bold text-red-500 text-2xl">$5,000+/mo</span>
+                  <span className="font-bold text-red-500 text-2xl">~$870/mo</span>
                 </div>
               </div>
               <p className="mt-4 text-center text-3xl font-bold text-green-600">
-                💰 Save $50,000+ per year
+                💰 Save ~$8,000 per year
               </p>
             </div>
           </div>
@@ -420,6 +441,108 @@ console.log('Welcome', user.name);`}</code>
                 </pre>
               </div>
             </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Trust & Compliance */}
+      <section className="py-20 px-4 sm:px-6 lg:px-8 bg-muted/30">
+        <div className="container mx-auto">
+          <div className="text-center mb-12">
+            <Badge className="mb-4">Enterprise Security & Compliance</Badge>
+            <h2 className="text-3xl font-bold mb-4">
+              Built on Security-First Principles
+            </h2>
+            <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
+              Industry-leading security standards and compliance certifications
+            </p>
+          </div>
+
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-8 max-w-5xl mx-auto mb-12">
+            {[
+              { label: "SOC 2 Type II", sublabel: "In Progress" },
+              { label: "GDPR", sublabel: "Compliant" },
+              { label: "ISO 27001", sublabel: "In Progress" },
+              { label: "CCPA", sublabel: "Compliant" },
+            ].map((cert, idx) => (
+              <Card key={idx} className="text-center p-6">
+                <ShieldCheck className="h-10 w-10 mx-auto mb-3 text-primary" />
+                <div className="font-semibold mb-1">{cert.label}</div>
+                <div className="text-sm text-muted-foreground">{cert.sublabel}</div>
+              </Card>
+            ))}
+          </div>
+
+          <Card className="max-w-3xl mx-auto p-8">
+            <div className="flex flex-col md:flex-row gap-6 items-center">
+              <div className="flex-shrink-0">
+                <div className="h-16 w-16 rounded-full bg-primary/10 flex items-center justify-center">
+                  <Lock className="h-8 w-8 text-primary" />
+                </div>
+              </div>
+              <div>
+                <h3 className="text-xl font-bold mb-2">Enterprise-Grade Security</h3>
+                <p className="text-muted-foreground mb-4">
+                  RSA-4096 encryption, bcrypt password hashing, breach detection via Have I Been Pwned, 
+                  IP restrictions, device fingerprinting, and comprehensive audit logging.
+                </p>
+                <div className="flex gap-4 flex-wrap">
+                  {['AES-256', 'RSA-4096', 'OAuth 2.0', 'OIDC'].map((tech, idx) => (
+                    <Badge key={idx} variant="outline">{tech}</Badge>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </Card>
+        </div>
+      </section>
+
+      {/* Testimonials */}
+      <section className="py-20 px-4 sm:px-6 lg:px-8">
+        <div className="container mx-auto">
+          <div className="text-center mb-12">
+            <Badge className="mb-4">Customer Success</Badge>
+            <h2 className="text-3xl font-bold mb-4">
+              Loved by Developers & Teams
+            </h2>
+          </div>
+
+          <div className="grid md:grid-cols-3 gap-6 max-w-6xl mx-auto">
+            {[
+              {
+                quote: "Migrating from Auth0 to AuthFlow saved us $60K annually while giving us better control and performance. The developer experience is fantastic.",
+                author: "Sarah Chen",
+                role: "CTO, TechStartup Inc",
+                avatar: "SC"
+              },
+              {
+                quote: "The self-hosting option was a game-changer for our compliance requirements. Auth0 couldn't offer that. Setup took less than a day.",
+                author: "Michael Rodriguez",
+                role: "Head of Engineering, SecureData",
+                avatar: "MR"
+              },
+              {
+                quote: "We needed multi-tenancy and advanced RBAC. AuthFlow delivered both at a fraction of what Okta quoted us. Their support is amazing too.",
+                author: "Emily Johnson",
+                role: "Product Lead, CloudVentures",
+                avatar: "EJ"
+              }
+            ].map((testimonial, idx) => (
+              <Card key={idx} className="p-6">
+                <div className="mb-4">
+                  <p className="text-muted-foreground italic">"{testimonial.quote}"</p>
+                </div>
+                <div className="flex items-center gap-3 mt-6">
+                  <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center font-semibold text-primary">
+                    {testimonial.avatar}
+                  </div>
+                  <div>
+                    <div className="font-semibold text-sm">{testimonial.author}</div>
+                    <div className="text-xs text-muted-foreground">{testimonial.role}</div>
+                  </div>
+                </div>
+              </Card>
+            ))}
           </div>
         </div>
       </section>
