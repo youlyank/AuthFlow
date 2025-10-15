@@ -26,16 +26,19 @@ import {
 } from "@/components/ui/dialog";
 import { Logo } from "@/components/Logo";
 import { ThemeToggle } from "@/components/ThemeToggle";
-import { Eye, EyeOff, Mail, Lock, LogIn, Wand2, Send } from "lucide-react";
+import { Eye, EyeOff, Mail, Lock, LogIn, Wand2, Send, Fingerprint } from "lucide-react";
 import { SiGoogle, SiGithub } from "react-icons/si";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { startAuthentication } from "@simplewebauthn/browser";
 
 export default function LoginPage() {
   const [, setLocation] = useLocation();
   const [showPassword, setShowPassword] = useState(false);
   const [magicLinkDialogOpen, setMagicLinkDialogOpen] = useState(false);
   const [magicLinkEmail, setMagicLinkEmail] = useState("");
+  const [passkeyDialogOpen, setPasskeyDialogOpen] = useState(false);
+  const [passkeyEmail, setPasskeyEmail] = useState("");
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -96,6 +99,40 @@ export default function LoginPage() {
     },
   });
 
+  const passkeyLoginMutation = useMutation({
+    mutationFn: async (email: string) => {
+      // Start authentication
+      const options = await apiRequest("POST", "/api/webauthn/authenticate/start", { email }) as any;
+      
+      // Trigger browser WebAuthn
+      const credential = await startAuthentication({ optionsJSON: options });
+      
+      // Verify authentication
+      const result = await apiRequest("POST", "/api/webauthn/authenticate/verify", {
+        response: credential,
+      }) as any;
+      
+      return result;
+    },
+    onSuccess: (data: any) => {
+      queryClient.setQueryData(["/api/auth/me"], { user: data.user });
+      toast({
+        title: "Signed in successfully!",
+        description: "Welcome back to Authflow",
+      });
+      setPasskeyDialogOpen(false);
+      setPasskeyEmail("");
+      setLocation("/");
+    },
+    onError: (error: Error) => {
+      toast({
+        variant: "destructive",
+        title: "Passkey login failed",
+        description: error.message || "Please try again or use another login method",
+      });
+    },
+  });
+
   return (
     <div className="min-h-screen flex items-center justify-center bg-background p-4">
       <div className="absolute top-4 right-4">
@@ -136,17 +173,72 @@ export default function LoginPage() {
             </Button>
           </div>
 
-          <Dialog open={magicLinkDialogOpen} onOpenChange={setMagicLinkDialogOpen}>
-            <DialogTrigger asChild>
-              <Button
-                variant="outline"
-                className="w-full hover-elevate active-elevate-2"
-                data-testid="button-magic-link"
-              >
-                <Wand2 className="mr-2 h-4 w-4" />
-                Sign in with Magic Link
-              </Button>
-            </DialogTrigger>
+          <div className="grid grid-cols-2 gap-3">
+            <Dialog open={passkeyDialogOpen} onOpenChange={setPasskeyDialogOpen}>
+              <DialogTrigger asChild>
+                <Button
+                  variant="outline"
+                  className="hover-elevate active-elevate-2"
+                  data-testid="button-passkey-login"
+                >
+                  <Fingerprint className="mr-2 h-4 w-4" />
+                  Passkey
+                </Button>
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Sign in with Passkey</DialogTitle>
+                  <DialogDescription>
+                    Use your fingerprint, face, or security key to sign in securely without a password.
+                  </DialogDescription>
+                </DialogHeader>
+                <div className="space-y-4 py-4">
+                  <div className="relative">
+                    <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                    <Input
+                      type="email"
+                      placeholder="name@company.com"
+                      value={passkeyEmail}
+                      onChange={(e) => setPasskeyEmail(e.target.value)}
+                      className="pl-10"
+                      data-testid="input-passkey-email"
+                    />
+                  </div>
+                </div>
+                <DialogFooter>
+                  <Button
+                    onClick={() => passkeyLoginMutation.mutate(passkeyEmail)}
+                    disabled={!passkeyEmail || passkeyLoginMutation.isPending}
+                    className="w-full"
+                    data-testid="button-authenticate-passkey"
+                  >
+                    {passkeyLoginMutation.isPending ? (
+                      <>
+                        <div className="animate-spin mr-2 h-4 w-4 border-2 border-current border-t-transparent rounded-full" />
+                        Authenticating...
+                      </>
+                    ) : (
+                      <>
+                        <Fingerprint className="mr-2 h-4 w-4" />
+                        Continue with Passkey
+                      </>
+                    )}
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
+
+            <Dialog open={magicLinkDialogOpen} onOpenChange={setMagicLinkDialogOpen}>
+              <DialogTrigger asChild>
+                <Button
+                  variant="outline"
+                  className="hover-elevate active-elevate-2"
+                  data-testid="button-magic-link"
+                >
+                  <Wand2 className="mr-2 h-4 w-4" />
+                  Magic Link
+                </Button>
+              </DialogTrigger>
             <DialogContent>
               <DialogHeader>
                 <DialogTitle>Passwordless Sign In</DialogTitle>
@@ -189,6 +281,7 @@ export default function LoginPage() {
               </DialogFooter>
             </DialogContent>
           </Dialog>
+          </div>
 
           <div className="relative">
             <div className="absolute inset-0 flex items-center">
